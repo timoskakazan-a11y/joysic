@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { fetchTracks, fetchArtistDetails, loginUser, registerUser, updateUserLikes } from './services/airtableService';
 import type { Track, Artist, User } from './types';
@@ -53,12 +54,13 @@ const App: React.FC = () => {
       setTimeout(() => setIsLoading(false), 1500);
     }
   }, []);
-
+  
   useEffect(() => {
-    if (user) {
+    // Only load tracks when the user logs in and tracks haven't been loaded yet.
+    if (user && tracks.length === 0) {
       loadTracks();
     }
-  }, [user, loadTracks]);
+  }, [user, tracks.length, loadTracks]);
 
   useEffect(() => {
     const audio = audioRef.current;
