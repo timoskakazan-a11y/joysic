@@ -253,7 +253,7 @@ const App: React.FC = () => {
               artist={selectedArtist} 
               onBack={handleCloseArtistPage} 
               onPlayTrack={handlePlayTrackFromArtistPage}
-              currentTrackId={currentTrack?.id}
+              currentTrackId={currentTrack && currentTrack.id}
               isPlaying={isPlaying}
               likedArtistIds={user.likedArtistIds}
               onToggleLikeArtist={(artistId) => handleToggleLike('artist', artistId)}

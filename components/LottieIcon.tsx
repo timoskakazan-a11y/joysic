@@ -29,7 +29,9 @@ const LottieIcon: React.FC<LottieIconProps> = ({ animationData, isPlaying, class
     }
 
     return () => {
-      animRef.current?.destroy();
+      if (animRef.current) {
+        animRef.current.destroy();
+      }
     };
   }, [animationData]);
 

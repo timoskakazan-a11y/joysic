@@ -19,7 +19,7 @@ const fetchFromAirtable = async (tableName: string, options: RequestInit = {}, p
 
   if (!response.ok) {
     const errorData = await response.json();
-    throw new Error(`Airtable API error (table: ${tableName}): ${errorData.error?.message || response.statusText}`);
+    throw new Error(`Airtable API error (table: ${tableName}): ${errorData.error && errorData.error.message || response.statusText}`);
   }
 
   return response.json();
@@ -86,13 +86,13 @@ export const updateUserLikes = async (userId: string, likedTrackIds: string[], l
 
 const mapAirtableRecordToTrack = (record: AirtableTrackRecord, artistMap: Map<string, string>): Track | null => {
     const fields = record.fields;
-    if (!fields['Название'] || !fields['Аудио']?.[0]?.url || !fields['Обложка трека']?.[0]?.url || !fields['Исполнитель']?.[0]) {
+    if (!fields['Название'] || !(fields['Аудио'] && fields['Аудио'][0] && fields['Аудио'][0].url) || !(fields['Обложка трека'] && fields['Обложка трека'][0] && fields['Обложка трека'][0].url) || !(fields['Исполнитель'] && fields['Исполнитель'][0])) {
         return null;
     }
     const artistId = fields['Исполнитель'][0];
     const artistName = artistMap.get(artistId) || 'Unknown Artist';
     const coverAttachment = fields['Обложка трека'][0];
-    const coverUrl = coverAttachment.thumbnails?.large?.url || coverAttachment.url;
+    const coverUrl = (coverAttachment.thumbnails && coverAttachment.thumbnails.large && coverAttachment.thumbnails.large.url) || coverAttachment.url;
     const coverUrlType = coverAttachment.type || 'image/jpeg';
 
     return { 
@@ -136,8 +136,8 @@ export const fetchArtistDetails = async (artistId: string): Promise<Artist> => {
         const artistMap = new Map<string, string>([[artistId, artistName]]);
         tracks = artistTracksRecords.records.map(record => mapAirtableRecordToTrack(record, artistMap)).filter((track): track is Track => track !== null);
     }
-    const photoAttachment = artistRecord.fields['Фото']?.[0];
-    const photoUrl = photoAttachment?.thumbnails?.large?.url || photoAttachment?.url;
+    const photoAttachment = artistRecord.fields['Фото'] && artistRecord.fields['Фото'][0];
+    const photoUrl = (photoAttachment && photoAttachment.thumbnails && photoAttachment.thumbnails.large && photoAttachment.thumbnails.large.url) || (photoAttachment && photoAttachment.url);
 
     return { id: artistRecord.id, name: artistName, description: artistRecord.fields['Описание'], status: artistRecord.fields['Status'], photoUrl: photoUrl, tracks: tracks };
 };
