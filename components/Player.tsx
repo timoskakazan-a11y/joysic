@@ -123,20 +123,20 @@ const Player: React.FC<PlayerProps> = ({ track, isPlaying, progress, onPlayPause
         }
         .range-slider-full::-webkit-slider-runnable-track {
           height: 6px;
-          background: linear-gradient(to right, var(--tw-color-accent) var(--progress-percentage), var(--tw-color-surface-light) var(--progress-percentage));
+          background: linear-gradient(to right, #bb86fc var(--progress-percentage), #2c2c2c var(--progress-percentage));
           border-radius: 9999px;
           transition: height 0.2s ease-in-out;
         }
         .range-slider-full:hover::-webkit-slider-runnable-track { height: 8px; }
         .range-slider-full::-moz-range-track {
            height: 6px;
-           background: linear-gradient(to right, var(--tw-color-accent) var(--progress-percentage), var(--tw-color-surface-light) var(--progress-percentage));
+           background: linear-gradient(to right, #bb86fc var(--progress-percentage), #2c2c2c var(--progress-percentage));
            border-radius: 9999px;
         }
         .range-slider-full::-webkit-slider-thumb {
           -webkit-appearance: none; appearance: none;
           width: 16px; height: 16px; border-radius: 9999px;
-          background-color: var(--tw-color-primary);
+          background-color: #ffffff;
           margin-top: -5px;
           transform: scale(0);
           transition: transform 0.2s ease-in-out;
@@ -146,7 +146,7 @@ const Player: React.FC<PlayerProps> = ({ track, isPlaying, progress, onPlayPause
         }
         .range-slider-full::-moz-range-thumb {
             width: 16px; height: 16px; border-radius: 9999px;
-            background-color: var(--tw-color-primary);
+            background-color: #ffffff;
             border: none;
             transform: scale(0);
             transition: transform 0.2s ease-in-out;

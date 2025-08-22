@@ -56,7 +56,6 @@ const App: React.FC = () => {
   }, []);
   
   useEffect(() => {
-    // Only load tracks when the user logs in and tracks haven't been loaded yet.
     if (user && tracks.length === 0) {
       loadTracks();
     }
@@ -125,7 +124,6 @@ const App: React.FC = () => {
       await updateUserLikes(user.id, updatedUser.likedTrackIds, updatedUser.likedArtistIds);
     } catch (error) {
       console.error('Failed to update likes:', error);
-      // Revert optimistic update on failure
       setUser(user);
       localStorage.setItem('joysicUser', JSON.stringify(user));
     }
@@ -140,14 +138,46 @@ const App: React.FC = () => {
   const handleNextTrack = useCallback(() => {
     if (shuffledTracks.length === 0) return;
     setCurrentTrackIndex(prev => (prev === null || prev === shuffledTracks.length - 1) ? 0 : prev + 1);
-    if (!isPlaying) setIsPlaying(true);
-  }, [shuffledTracks, isPlaying]);
+    setIsPlaying(true);
+  }, [shuffledTracks]);
 
   const handlePrevTrack = useCallback(() => {
     if (shuffledTracks.length === 0) return;
     setCurrentTrackIndex(prev => (prev === null || prev === 0) ? shuffledTracks.length - 1 : prev - 1);
-    if (!isPlaying) setIsPlaying(true);
-  }, [shuffledTracks, isPlaying]);
+    setIsPlaying(true);
+  }, [shuffledTracks]);
+
+  useEffect(() => {
+    const { mediaSession } = navigator;
+    if (!mediaSession) return;
+
+    if (currentTrack) {
+      mediaSession.metadata = new window.MediaMetadata({
+        title: currentTrack.title,
+        artist: currentTrack.artist,
+        album: currentTrack.artist,
+        artwork: [{ src: currentTrack.coverUrl, sizes: '512x512', type: 'image/png' }],
+      });
+
+      mediaSession.setActionHandler('play', handlePlayPause);
+      mediaSession.setActionHandler('pause', handlePlayPause);
+      mediaSession.setActionHandler('previoustrack', handlePrevTrack);
+      mediaSession.setActionHandler('nexttrack', handleNextTrack);
+    }
+    
+    return () => {
+      mediaSession.setActionHandler('play', null);
+      mediaSession.setActionHandler('pause', null);
+      mediaSession.setActionHandler('previoustrack', null);
+      mediaSession.setActionHandler('nexttrack', null);
+    };
+  }, [currentTrack, handlePlayPause, handlePrevTrack, handleNextTrack]);
+
+  useEffect(() => {
+    const { mediaSession } = navigator;
+    if (!mediaSession) return;
+    mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+  }, [isPlaying]);
   
   const handleTimeUpdate = () => {
     if (audioRef.current) setProgress({ currentTime: audioRef.current.currentTime, duration: audioRef.current.duration || 0 });
