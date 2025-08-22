@@ -22,18 +22,18 @@
               surface: '#1e1e1e',
               'surface-light': '#2c2c2c',
               primary: '#ffffff',
-              accent: '#ffffff',
+              accent: '#bb86fc', // Vibrant purple accent
               text: '#e5e7eb',
               'text-secondary': '#a1a1aa',
             },
             keyframes: {
               breathing: {
-                '0%, 100%': { transform: 'scale(1)', opacity: '0.9' },
-                '50%': { transform: 'scale(1.03)', opacity: '1' },
+                '0%, 100%': { transform: 'scale(1)', opacity: '0.8' },
+                '50%': { transform: 'scale(1.05)', opacity: '1' },
               }
             },
             animation: {
-              breathing: 'breathing 3s ease-in-out infinite',
+              breathing: 'breathing 2.5s ease-in-out infinite',
             }
           },
         },
@@ -49,7 +49,7 @@
 }
 </script>
 </head>
-  <body class="bg-background">
+  <body class="bg-background font-sans">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
   </body>

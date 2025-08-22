@@ -1,4 +1,3 @@
-
 export interface Track {
   id: string;
   title: string;
@@ -16,6 +15,14 @@ export interface Artist {
     status?: string;
     photoUrl?: string;
     tracks: Track[];
+}
+
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  likedTrackIds: string[];
+  likedArtistIds: string[];
 }
 
 export interface AirtableTrackRecord {
@@ -54,4 +61,15 @@ export interface AirtableArtistRecord {
         }[];
         'Треки'?: string[];
     };
+}
+
+export interface AirtableUserRecord {
+    id: string;
+    fields: {
+        'Почта': string;
+        'Пароль': string;
+        'Имя': string;
+        'Лайки песен'?: string[];
+        'Любимые исполнители'?: string[];
+    }
 }

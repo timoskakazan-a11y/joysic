@@ -1,7 +1,7 @@
 
 import React from 'react';
 import type { Track } from '../types';
-import { MusicNoteIcon, TextIcon, UserIcon, AudioFileIcon, PlayIcon, PauseIcon, SoundWaveIcon } from './IconComponents';
+import { MusicNoteIcon, TextIcon, UserIcon, PlayIcon, PauseIcon, SoundWaveIcon } from './IconComponents';
 
 interface MusicTableProps {
   tracks: Track[];

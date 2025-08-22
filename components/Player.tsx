@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { Track } from '../types';
-import { PlayIcon, PauseIcon, SkipBackIcon, SkipForwardIcon, ChevronDownIcon } from './IconComponents';
+import { PlayIcon, PauseIcon, SkipBackIcon, SkipForwardIcon, ChevronDownIcon, HeartIcon } from './IconComponents';
 
 interface PlayerProps {
   track: Track;
@@ -9,12 +9,14 @@ interface PlayerProps {
     currentTime: number;
     duration: number;
   };
+  isLiked: boolean;
   onPlayPause: () => void;
   onNext: () => void;
   onPrev: () => void;
   onSeek: (newTime: number) => void;
   onSelectArtist: (artistId: string) => void;
   onMinimize: () => void;
+  onToggleLike: () => void;
 }
 
 const formatTime = (seconds: number) => {
@@ -28,7 +30,7 @@ const AnimatedPlaceholder: React.FC<{ className?: string }> = ({ className }) =>
     <div className={`w-full h-full bg-surface-light animate-pulse ${className}`} />
 );
 
-const Player: React.FC<PlayerProps> = ({ track, isPlaying, progress, onPlayPause, onNext, onPrev, onSeek, onSelectArtist, onMinimize }) => {
+const Player: React.FC<PlayerProps> = ({ track, isPlaying, progress, onPlayPause, onNext, onPrev, onSeek, onSelectArtist, onMinimize, isLiked, onToggleLike }) => {
   const [isCoverLoaded, setIsCoverLoaded] = useState(false);
   const progressPercentage = (progress.duration > 0) ? (progress.currentTime / progress.duration) * 100 : 0;
 
@@ -51,9 +53,12 @@ const Player: React.FC<PlayerProps> = ({ track, isPlaying, progress, onPlayPause
     <div className="fixed inset-0 w-full h-full overflow-hidden bg-background">
       <div className="relative w-full h-full flex flex-col items-center text-text p-4 sm:p-8">
         
-        <header className="w-full max-w-md">
+        <header className="w-full max-w-md flex justify-between items-center">
             <button onClick={onMinimize} className="text-text-secondary hover:text-primary transition-colors" aria-label="Minimize player">
                 <ChevronDownIcon className="w-8 h-8"/>
+            </button>
+            <button onClick={onToggleLike} className={`${isLiked ? 'text-accent' : 'text-text-secondary'} hover:text-primary transition-colors`} aria-label="Like track">
+                <HeartIcon filled={isLiked} className="w-7 h-7" />
             </button>
         </header>
 
@@ -118,14 +123,14 @@ const Player: React.FC<PlayerProps> = ({ track, isPlaying, progress, onPlayPause
         }
         .range-slider-full::-webkit-slider-runnable-track {
           height: 6px;
-          background: linear-gradient(to right, var(--tw-color-primary) var(--progress-percentage), var(--tw-color-surface-light) var(--progress-percentage));
+          background: linear-gradient(to right, var(--tw-color-accent) var(--progress-percentage), var(--tw-color-surface-light) var(--progress-percentage));
           border-radius: 9999px;
           transition: height 0.2s ease-in-out;
         }
         .range-slider-full:hover::-webkit-slider-runnable-track { height: 8px; }
         .range-slider-full::-moz-range-track {
            height: 6px;
-           background: linear-gradient(to right, var(--tw-color-primary) var(--progress-percentage), var(--tw-color-surface-light) var(--progress-percentage));
+           background: linear-gradient(to right, var(--tw-color-accent) var(--progress-percentage), var(--tw-color-surface-light) var(--progress-percentage));
            border-radius: 9999px;
         }
         .range-slider-full::-webkit-slider-thumb {
