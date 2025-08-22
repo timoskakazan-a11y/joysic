@@ -93,8 +93,18 @@ const mapAirtableRecordToTrack = (record: AirtableTrackRecord, artistMap: Map<st
     const artistName = artistMap.get(artistId) || 'Unknown Artist';
     const coverAttachment = fields['Обложка трека'][0];
     const coverUrl = coverAttachment.thumbnails?.large?.url || coverAttachment.url;
+    const coverUrlType = coverAttachment.type || 'image/jpeg';
 
-    return { id: record.id, title: fields['Название'], artist: artistName, artistId: artistId, lyrics: fields['Слова'] || '', audioUrl: fields['Аудио'][0].url, coverUrl: coverUrl };
+    return { 
+        id: record.id, 
+        title: fields['Название'], 
+        artist: artistName, 
+        artistId: artistId, 
+        lyrics: fields['Слова'] || '', 
+        audioUrl: fields['Аудио'][0].url, 
+        coverUrl: coverUrl,
+        coverUrlType: coverUrlType,
+    };
 };
 
 export const fetchTracks = async (): Promise<Track[]> => {

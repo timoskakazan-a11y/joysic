@@ -155,8 +155,12 @@ const App: React.FC = () => {
       mediaSession.metadata = new window.MediaMetadata({
         title: currentTrack.title,
         artist: currentTrack.artist,
-        album: currentTrack.artist,
-        artwork: [{ src: currentTrack.coverUrl, sizes: '512x512', type: 'image/png' }],
+        album: 'Joysic',
+        artwork: [{ 
+          src: currentTrack.coverUrl, 
+          sizes: '512x512', 
+          type: currentTrack.coverUrlType || 'image/jpeg' 
+        }],
       });
 
       mediaSession.setActionHandler('play', handlePlayPause);

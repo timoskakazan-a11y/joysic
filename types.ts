@@ -6,6 +6,7 @@ export interface Track {
   lyrics: string;
   audioUrl: string;
   coverUrl: string;
+  coverUrlType: string;
 }
 
 export interface Artist {
@@ -35,6 +36,7 @@ export interface AirtableTrackRecord {
     'Аудио'?: { url: string }[];
     'Обложка трека'?: {
       url: string;
+      type: string;
       thumbnails?: {
         large?: {
           url: string;
