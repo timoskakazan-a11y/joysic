@@ -1,7 +1,7 @@
 
 import React from 'react';
 import type { Track } from '../types';
-import { MusicNoteIcon, TextIcon, UserIcon, AudioFileIcon, PlayIcon, PauseIcon, Volume2Icon } from './IconComponents';
+import { MusicNoteIcon, TextIcon, UserIcon, AudioFileIcon, PlayIcon, PauseIcon, SoundWaveIcon } from './IconComponents';
 
 interface MusicTableProps {
   tracks: Track[];
@@ -37,13 +37,13 @@ const MusicTable: React.FC<MusicTableProps> = ({ tracks, currentTrackId, isPlayi
                 key={track.id}
                 onClick={() => onSelectTrack(index)}
                 className={`grid grid-cols-12 gap-4 px-4 sm:px-6 py-3 text-sm items-center border-b border-slate-800 last:border-b-0 cursor-pointer group transition-colors duration-200 ${
-                  isActive ? 'bg-cyan-500/10' : 'hover:bg-slate-700/50'
+                  isActive ? 'bg-surface-light' : 'hover:bg-slate-700/50'
                 }`}
               >
                 <div className="col-span-1 flex items-center justify-center">
                   {isActive ? (
                     <div className="relative w-6 h-6 flex items-center justify-center">
-                        {isPlaying ? <Volume2Icon className="w-5 h-5 text-cyan-400 animate-pulse" /> : <PlayIcon className="w-5 h-5 text-cyan-400" />}
+                        {isPlaying ? <SoundWaveIcon isPlaying={isPlaying} className="w-5 h-5 text-primary" /> : <PlayIcon className="w-5 h-5 text-primary" />}
                     </div>
                   ) : (
                     <span className="text-slate-400 group-hover:hidden">{index + 1}</span>
@@ -52,7 +52,7 @@ const MusicTable: React.FC<MusicTableProps> = ({ tracks, currentTrackId, isPlayi
                     <PlayIcon className="w-6 h-6" />
                   </button>
                 </div>
-                <div className={`col-span-4 flex items-center gap-3 ${isActive ? 'text-cyan-400 font-semibold' : 'text-white'}`}>
+                <div className={`col-span-4 flex items-center gap-3 ${isActive ? 'text-primary font-semibold' : 'text-white'}`}>
                     <img src={track.coverUrl} alt={track.title} className="w-10 h-10 rounded-md object-cover"/>
                     <span>{track.title}</span>
                 </div>

@@ -36,7 +36,7 @@ const TrackList: React.FC<TrackListProps> = ({ tracks, currentTrackId, isPlaying
               <p className="text-sm text-text-secondary">{track.artist}</p>
             </div>
             {isActive && isPlaying && (
-              <SoundWaveIcon className="w-6 h-6 text-primary" />
+              <SoundWaveIcon isPlaying={isPlaying} className="w-6 h-6 text-primary" />
             )}
           </div>
         );

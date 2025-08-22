@@ -81,8 +81,8 @@ const ArtistPage: React.FC<ArtistPageProps> = ({ artist, onBack, onPlayTrack, cu
                 className={`flex items-center p-3 rounded-lg cursor-pointer transition-colors duration-200 group ${isActive ? 'bg-surface-light' : 'hover:bg-surface'}`}
               >
                 <div className="w-10 flex-shrink-0 text-center text-text-secondary mr-4">
-                    {isActive && isPlaying ? (
-                        <SoundWaveIcon className="w-5 h-5 mx-auto text-accent" />
+                    {isActive ? (
+                        <SoundWaveIcon isPlaying={isPlaying} className="w-5 h-5 mx-auto" />
                     ) : (
                         <span className="group-hover:hidden">{index + 1}</span>
                     )}
@@ -94,7 +94,7 @@ const ArtistPage: React.FC<ArtistPageProps> = ({ artist, onBack, onPlayTrack, cu
                   <img src={track.coverUrl} alt={track.title} className="w-full h-full object-cover" />
                 </div>
                 <div className="flex-grow mx-4">
-                  <p className={`font-semibold ${isActive ? 'text-accent' : 'text-primary'}`}>{track.title}</p>
+                  <p className={`font-semibold ${isActive ? 'text-primary' : 'text-text-secondary'}`}>{track.title}</p>
                 </div>
                 <div className="text-primary opacity-0 group-hover:opacity-100 transition-opacity" aria-hidden="true">
                     {isActive && isPlaying ? <PauseIcon className="w-8 h-8"/> : <PlayIcon className="w-8 h-8" />}
