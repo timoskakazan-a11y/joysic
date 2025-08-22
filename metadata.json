@@ -1,0 +1,5 @@
+{
+  "name": "Acoustic - Modern Music Player",
+  "description": "A sleek, modern music player with a user-friendly interface, designed to provide a seamless listening experience. It fetches tracks from an Airtable base and presents them in a clean, navigable list.",
+  "requestFramePermissions": []
+}
