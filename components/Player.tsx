@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import type { Track } from '../types';
 import { PlayIcon, PauseIcon, SkipBackIcon, SkipForwardIcon, ChevronDownIcon } from './IconComponents';
@@ -69,10 +68,10 @@ const Player: React.FC<PlayerProps> = ({ track, isPlaying, progress, onPlayPause
               onError={() => setIsCoverLoaded(true)} // Handle image load errors
             />
           </div>
-          <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight mb-2 text-primary">
+          <h1 className="text-3xl sm:text-4xl font-black tracking-tight mb-2 text-primary">
             {track.title}
           </h1>
-          <button onClick={handleArtistClick} className="text-lg sm:text-xl text-text-secondary hover:text-primary transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50 rounded-md">
+          <button onClick={handleArtistClick} className="text-lg sm:text-xl font-black text-text-secondary hover:text-primary transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50 rounded-md">
             {track.artist}
           </button>
         </main>

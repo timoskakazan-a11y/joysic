@@ -5,6 +5,7 @@ import type { Track, Artist } from './types';
 import Player from './components/Player';
 import ArtistPage from './components/ArtistPage';
 import MiniPlayer from './components/MiniPlayer';
+import SplashScreen from './components/SplashScreen';
 
 const App: React.FC = () => {
   const [tracks, setTracks] = useState<Track[]>([]);
@@ -41,7 +42,7 @@ const App: React.FC = () => {
         setError('Failed to load tracks. Please check your connection and Airtable configuration.');
         console.error(err);
       } finally {
-        setIsLoading(false);
+        setTimeout(() => setIsLoading(false), 1500); // Simulate a minimum loading time for splash screen
       }
     };
     loadTracks();
@@ -155,11 +156,7 @@ const App: React.FC = () => {
   const handleMinimizePlayer = () => setIsPlayerExpanded(false);
   
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-background text-text flex justify-center items-center">
-        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-surface-light"></div>
-      </div>
-    );
+    return <SplashScreen />;
   }
 
   if (error) {

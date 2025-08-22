@@ -4,18 +4,18 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Acoustic - Modern Music Player</title>
+    <title>Joysic - Modern Music Player</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,100..1000&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie.min.js"></script>
     <script>
       tailwind.config = {
         theme: {
           extend: {
             fontFamily: {
-              sans: ['Inter', 'sans-serif'],
+              sans: ['"Roboto Flex"', 'sans-serif'],
             },
             colors: {
               background: '#121212',
@@ -25,6 +25,15 @@
               accent: '#ffffff',
               text: '#e5e7eb',
               'text-secondary': '#a1a1aa',
+            },
+            keyframes: {
+              breathing: {
+                '0%, 100%': { transform: 'scale(1)', opacity: '0.9' },
+                '50%': { transform: 'scale(1.03)', opacity: '1' },
+              }
+            },
+            animation: {
+              breathing: 'breathing 3s ease-in-out infinite',
             }
           },
         },

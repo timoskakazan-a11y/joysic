@@ -1,4 +1,3 @@
-
 import React from 'react';
 import type { Track } from '../types';
 import { PlayIcon, PauseIcon } from './IconComponents';
@@ -32,8 +31,8 @@ const MiniPlayer: React.FC<MiniPlayerProps> = ({ track, isPlaying, progress, onP
           <img src={track.coverUrl} alt={track.title} className="w-full h-full object-cover" />
         </div>
         <div className="flex-grow mx-3 overflow-hidden">
-            <p className="font-semibold text-primary truncate">{track.title}</p>
-            <p className="text-sm text-text-secondary truncate">{track.artist}</p>
+            <p className="font-black text-primary truncate">{track.title}</p>
+            <p className="text-sm font-black text-text-secondary truncate">{track.artist}</p>
         </div>
         <button
             onClick={handlePlayPauseClick}

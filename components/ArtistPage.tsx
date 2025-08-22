@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import type { Artist } from '../types';
 import { PlayIcon, PauseIcon, ChevronLeftIcon, SoundWaveIcon } from './IconComponents';
@@ -46,7 +45,7 @@ const ArtistPage: React.FC<ArtistPageProps> = ({ artist, onBack, onPlayTrack, cu
                 )}
             </div>
             <div className="text-center md:text-left">
-                <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight text-primary mb-2">
+                <h1 className="text-4xl sm:text-6xl font-black tracking-tight text-primary mb-2">
                     {artist.name}
                 </h1>
                 {artist.description && (
@@ -94,7 +93,7 @@ const ArtistPage: React.FC<ArtistPageProps> = ({ artist, onBack, onPlayTrack, cu
                   <img src={track.coverUrl} alt={track.title} className="w-full h-full object-cover" />
                 </div>
                 <div className="flex-grow mx-4">
-                  <p className={`font-semibold ${isActive ? 'text-primary' : 'text-text-secondary'}`}>{track.title}</p>
+                  <p className={`font-black ${isActive ? 'text-primary' : 'text-text-secondary'}`}>{track.title}</p>
                 </div>
                 <div className="text-primary opacity-0 group-hover:opacity-100 transition-opacity" aria-hidden="true">
                     {isActive && isPlaying ? <PauseIcon className="w-8 h-8"/> : <PlayIcon className="w-8 h-8" />}
