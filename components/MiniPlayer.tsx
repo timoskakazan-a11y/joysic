@@ -19,20 +19,20 @@ const MiniPlayer: React.FC<MiniPlayerProps> = ({ track, isPlaying, progress, onP
   return (
     <div className="px-2 pb-2" onClick={onExpand} >
         <div 
-            className="relative h-16 bg-surface rounded-xl flex items-center p-2 cursor-pointer border border-surface-light shadow-2xl"
+            className="relative h-16 bg-surface rounded-xl flex items-center p-2 cursor-pointer border border-surface-light shadow-2xl backdrop-blur-lg bg-opacity-80"
             aria-label="Expand player"
             role="button"
         >
         <div className="absolute top-0 left-0 w-full h-0.5 bg-surface-light">
-            <div className="h-full bg-primary" style={{ width: `${progress}%` }}></div>
+            <div className="h-full bg-accent" style={{ width: `${progress}%` }}></div>
         </div>
 
         <div className="relative w-12 h-12 rounded-lg bg-surface-light overflow-hidden flex-shrink-0">
           <img src={track.coverUrl} alt={track.title} className="w-full h-full object-cover" />
         </div>
         <div className="flex-grow mx-3 overflow-hidden">
-            <p className="font-black text-primary truncate">{track.title}</p>
-            <p className="text-sm font-black text-text-secondary truncate">{track.artist}</p>
+            <p className="font-semibold text-primary truncate">{track.title}</p>
+            <p className="text-sm text-text-secondary truncate">{track.artist}</p>
         </div>
         <button
             onClick={handlePlayPauseClick}

@@ -1,9 +1,11 @@
-import type { Track, Artist, AirtableTrackRecord, AirtableArtistRecord, User, AirtableUserRecord } from '../types';
+import type { Track, Artist, AirtableTrackRecord, AirtableArtistRecord, User, AirtableUserRecord, Playlist, AirtablePlaylistRecord } from '../types';
 
 const AIRTABLE_BASE_ID = 'appuGObKAO57IqWRN';
 const MUSIC_TABLE_NAME = 'music';
 const ARTISTS_TABLE_NAME = 'исполнители';
 const USERS_TABLE_NAME = 'пользователи';
+const PLAYLISTS_TABLE_NAME = 'плейлисты';
+const PHOTOS_TABLE_NAME = 'фото';
 const AIRTABLE_API_KEY = 'patZi9FoyhVvaJGnt.fdefebefbc59c7f41ff1bbf09d80f9a2da8f35dcc24c98e9766dba336053487d';
 
 const fetchFromAirtable = async (tableName: string, options: RequestInit = {}, path: string = '') => {
@@ -32,6 +34,7 @@ const mapAirtableRecordToUser = (record: AirtableUserRecord): User => {
         name: record.fields['Имя'],
         likedTrackIds: record.fields['Лайки песен'] || [],
         likedArtistIds: record.fields['Любимые исполнители'] || [],
+        favoritesPlaylistId: record.fields['Любимый плейлист']?.[0],
     };
 };
 
@@ -48,39 +51,108 @@ export const loginUser = async (email: string, password: string): Promise<User> 
 };
 
 export const registerUser = async (email: string, password: string, name: string): Promise<User> => {
-    // Check if user already exists
+    // 1. Check if user already exists
     const checkFormula = `{Почта} = '${email}'`;
     const checkResponse = await fetchFromAirtable(USERS_TABLE_NAME, {}, `?filterByFormula=${encodeURIComponent(checkFormula)}`);
     if (checkResponse.records.length > 0) {
         throw new Error('Пользователь с таким email уже существует');
     }
 
-    const response = await fetchFromAirtable(USERS_TABLE_NAME, {
+    // 2. Create user record
+    const userCreateResponse = await fetchFromAirtable(USERS_TABLE_NAME, {
         method: 'POST',
         body: JSON.stringify({
-            fields: {
-                'Почта': email,
-                'Пароль': password,
-                'Имя': name,
-            }
+            records: [{ fields: { 'Почта': email, 'Пароль': password, 'Имя': name } }]
         })
     });
-    return mapAirtableRecordToUser(response);
-};
 
-export const updateUserLikes = async (userId: string, likedTrackIds: string[], likedArtistIds: string[]): Promise<void> => {
+    if (!userCreateResponse.records || userCreateResponse.records.length === 0) {
+        throw new Error('Не удалось создать пользователя.');
+    }
+    const newUserId = userCreateResponse.records[0].id;
+
+    // Fetch cover photo for "Любимое" playlist from the "фото" table
+    const photoFormula = `{Название} = 'Любимое плейлист'`;
+    const photoResponse = await fetchFromAirtable(PHOTOS_TABLE_NAME, {}, `?filterByFormula=${encodeURIComponent(photoFormula)}`);
+    
+    // Use the fetched URL, or a fallback if not found
+    let coverUrl = 'https://i.postimg.cc/FKncyR8c/24d35647-7d57-43ae-8dd6-82e5f299ecc7.png'; // Fallback
+    if (photoResponse.records.length > 0 && photoResponse.records[0].fields['Фото']?.[0]?.url) {
+        coverUrl = photoResponse.records[0].fields['Фото'][0].url;
+    }
+
+    // 3. Create "Любимое" playlist
+    const playlistCreateResponse = await fetchFromAirtable(PLAYLISTS_TABLE_NAME, {
+        method: 'POST',
+        body: JSON.stringify({
+            records: [{
+                fields: {
+                    'Название': 'Любимое',
+                    'Описание': 'Ваши любимые треки',
+                    'Обложка': [{ url: coverUrl }],
+                    'пользователи': [newUserId]
+                }
+            }]
+        })
+    });
+
+    if (!playlistCreateResponse.records || playlistCreateResponse.records.length === 0) {
+        // In a real app, we should delete the created user here for transactional integrity.
+        throw new Error('Не удалось создать плейлист "Любимое".');
+    }
+    const newPlaylistId = playlistCreateResponse.records[0].id;
+
+    // 4. Update user with the ID of the new "Любимое" playlist
     await fetchFromAirtable(USERS_TABLE_NAME, {
         method: 'PATCH',
         body: JSON.stringify({
             records: [{
-                id: userId,
+                id: newUserId,
+                fields: { 'Любимый плейлист': [newPlaylistId] }
+            }]
+        })
+    });
+
+    // 5. Fetch the full, updated user record to ensure all data is present for the app state
+    const fullUserRecord = await fetchFromAirtable(USERS_TABLE_NAME, {}, `/${newUserId}`);
+    if (!fullUserRecord) {
+        throw new Error('Не удалось получить данные нового пользователя после регистрации.');
+    }
+    
+    return mapAirtableRecordToUser(fullUserRecord);
+};
+
+export const updateUserLikes = async (user: User, likedTrackIds: string[], likedArtistIds: string[]): Promise<void> => {
+    const promises: Promise<any>[] = [];
+    
+    // Update user's liked lists
+    promises.push(fetchFromAirtable(USERS_TABLE_NAME, {
+        method: 'PATCH',
+        body: JSON.stringify({
+            records: [{
+                id: user.id,
                 fields: {
                     'Лайки песен': likedTrackIds,
                     'Любимые исполнители': likedArtistIds,
                 }
             }]
         })
-    });
+    }));
+
+    // Update the "Favorites" playlist with the liked tracks
+    if (user.favoritesPlaylistId) {
+        promises.push(fetchFromAirtable(PLAYLISTS_TABLE_NAME, {
+            method: 'PATCH',
+            body: JSON.stringify({
+                records: [{
+                    id: user.favoritesPlaylistId,
+                    fields: { 'Песни': likedTrackIds }
+                }]
+            })
+        }));
+    }
+
+    await Promise.all(promises);
 };
 
 
@@ -140,4 +212,32 @@ export const fetchArtistDetails = async (artistId: string): Promise<Artist> => {
     const photoUrl = (photoAttachment && photoAttachment.thumbnails && photoAttachment.thumbnails.large && photoAttachment.thumbnails.large.url) || (photoAttachment && photoAttachment.url);
 
     return { id: artistRecord.id, name: artistName, description: artistRecord.fields['Описание'], status: artistRecord.fields['Status'], photoUrl: photoUrl, tracks: tracks };
+};
+
+const mapAirtableRecordToPlaylist = (record: AirtablePlaylistRecord): Playlist | null => {
+    const fields = record.fields;
+    if (!fields['Название'] || !fields['Обложка']?.[0]?.url) {
+        return null;
+    }
+    return {
+        id: record.id,
+        name: fields['Название'],
+        description: fields['Описание'] || '',
+        coverUrl: fields['Обложка'][0].url,
+        trackIds: fields['Песни'] || [],
+        tracks: [], // to be populated later
+        isFavorites: false, // will be set later
+    };
+};
+
+export const fetchPlaylistsForUser = async (userId: string): Promise<Playlist[]> => {
+    // The Airtable formula `FIND(recordId, ARRAYJOIN({linked_records}))` is unreliable
+    // because ARRAYJOIN operates on the primary field (display value) of linked records, not their IDs.
+    // A more reliable method, without changing the base schema, is to fetch all playlists and filter on the client-side.
+    // This is less performant for large datasets but acceptable for this application's scale.
+    const response = await fetchFromAirtable(PLAYLISTS_TABLE_NAME, {});
+    return response.records
+        .filter((record: AirtablePlaylistRecord) => record.fields['пользователи']?.includes(userId))
+        .map(mapAirtableRecordToPlaylist)
+        .filter((p): p is Playlist => p !== null);
 };

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import type { Artist } from '../types';
 import { PlayIcon, PauseIcon, ChevronLeftIcon, SoundWaveIcon } from './IconComponents';
@@ -10,7 +11,7 @@ interface ArtistPageProps {
   artist: Artist;
   onBack: () => void;
   onPlayTrack: (trackId: string) => void;
-  currentTrackId?: string;
+  currentTrackId?: string | null;
   isPlaying: boolean;
   likedArtistIds: string[];
   onToggleLikeArtist: (artistId: string) => void;
@@ -34,9 +35,24 @@ const ArtistPage: React.FC<ArtistPageProps> = ({ artist, onBack, onPlayTrack, cu
 
   return (
     <div className="min-h-screen bg-background text-text font-sans">
-      <main className="max-w-4xl mx-auto p-4 sm:p-6">
-        <header className="flex flex-col md:flex-row items-center gap-6 md:gap-10 mb-8 mt-4">
-            <div className="relative w-40 h-40 md:w-48 md:h-48 rounded-full bg-surface shadow-lg overflow-hidden flex-shrink-0">
+      <div className="absolute top-0 left-0 w-full h-72 md:h-96">
+        {isImageLoaded && artist.photoUrl && (
+          <>
+            <img src={artist.photoUrl} alt="" className="w-full h-full object-cover opacity-30 blur-xl" aria-hidden="true"/>
+            <div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-transparent"></div>
+          </>
+        )}
+      </div>
+      <main className="relative max-w-4xl mx-auto p-4 sm:p-6 z-10">
+        <button 
+            onClick={onBack} 
+            className="absolute top-4 left-4 bg-surface/50 backdrop-blur-md text-primary rounded-full h-10 w-10 flex items-center justify-center hover:bg-surface-light transition-colors"
+            aria-label="Back"
+        >
+            <ChevronLeftIcon className="w-6 h-6" />
+        </button>
+        <header className="flex flex-col md:flex-row items-center gap-6 md:gap-10 mb-8 mt-16 md:mt-24">
+            <div className="relative w-40 h-40 md:w-48 md:h-48 rounded-full bg-surface shadow-lg overflow-hidden flex-shrink-0 border-4 border-background">
                 {!isImageLoaded && <AnimatedPlaceholder className="rounded-full w-full h-full" />}
                 {artist.photoUrl && (
                      <img 
@@ -63,14 +79,6 @@ const ArtistPage: React.FC<ArtistPageProps> = ({ artist, onBack, onPlayTrack, cu
             </div>
         </header>
         
-        <button 
-            onClick={onBack} 
-            className="absolute top-4 left-4 bg-surface/50 backdrop-blur-md text-primary rounded-full h-10 w-10 flex items-center justify-center hover:bg-surface-light transition-colors"
-            aria-label="Back"
-        >
-            <ChevronLeftIcon className="w-6 h-6" />
-        </button>
-      
         {artist.status === 'иноагент' && (
           <div className="bg-surface border border-surface-light text-text-secondary text-sm p-4 rounded-xl mb-8">
             <p><strong>ВНИМАНИЕ:</strong> Данный исполнитель признан иностранным агентом на территории РФ.</p>
@@ -92,19 +100,21 @@ const ArtistPage: React.FC<ArtistPageProps> = ({ artist, onBack, onPlayTrack, cu
                     {isActive ? (
                         <SoundWaveIcon isPlaying={isPlaying} className="w-5 h-5 mx-auto text-accent" />
                     ) : (
-                        <>
-                            <span className="group-hover:hidden transition-opacity">{index + 1}</span>
-                            <div className="hidden group-hover:block">
-                                <PlayIcon className="w-5 h-5 mx-auto text-primary"/>
+                       <div className="relative h-5 w-5 mx-auto">
+                            <span className="absolute inset-0 flex items-center justify-center opacity-100 group-hover:opacity-0 transition-opacity duration-300">
+                                {index + 1}
+                            </span>
+                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                                <PlayIcon className="w-5 h-5 text-primary"/>
                             </div>
-                        </>
+                        </div>
                     )}
                 </div>
                 <div className="relative w-12 h-12 rounded-md bg-surface overflow-hidden flex-shrink-0">
                   <img src={track.coverUrl} alt={track.title} className="w-full h-full object-cover" />
                 </div>
                 <div className="flex-grow mx-4">
-                  <p className={`font-black ${isActive ? 'text-accent' : 'text-text'}`}>{track.title}</p>
+                  <p className={`font-semibold ${isActive ? 'text-accent' : 'text-text'}`}>{track.title}</p>
                 </div>
               </div>
             )}) : (

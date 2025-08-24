@@ -24,6 +24,17 @@ export interface User {
   name: string;
   likedTrackIds: string[];
   likedArtistIds: string[];
+  favoritesPlaylistId?: string;
+}
+
+export interface Playlist {
+  id: string;
+  name: string;
+  description: string;
+  coverUrl: string;
+  trackIds: string[];
+  tracks: Track[];
+  isFavorites: boolean;
 }
 
 export interface AirtableTrackRecord {
@@ -73,5 +84,17 @@ export interface AirtableUserRecord {
         'Имя': string;
         'Лайки песен'?: string[];
         'Любимые исполнители'?: string[];
+        'Любимый плейлист'?: string[];
     }
+}
+
+export interface AirtablePlaylistRecord {
+  id: string;
+  fields: {
+    'Название'?: string;
+    'Описание'?: string;
+    'Обложка'?: { url: string }[];
+    'Песни'?: string[];
+    'пользователи'?: string[];
+  }
 }

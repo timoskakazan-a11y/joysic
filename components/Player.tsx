@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import type { Track } from '../types';
 import { PlayIcon, PauseIcon, SkipBackIcon, SkipForwardIcon, ChevronDownIcon, HeartIcon } from './IconComponents';
@@ -44,7 +45,6 @@ const Player: React.FC<PlayerProps> = ({ track, isPlaying, progress, onPlayPause
   
   const handleArtistClick = () => {
       if (track.artistId) {
-          onMinimize();
           onSelectArtist(track.artistId);
       }
   };
@@ -76,7 +76,7 @@ const Player: React.FC<PlayerProps> = ({ track, isPlaying, progress, onPlayPause
           <h1 className="text-3xl sm:text-4xl font-black tracking-tight mb-2 text-primary">
             {track.title}
           </h1>
-          <button onClick={handleArtistClick} className="text-lg sm:text-xl font-black text-text-secondary hover:text-primary transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50 rounded-md">
+          <button onClick={handleArtistClick} className="text-lg sm:text-xl font-medium text-text-secondary hover:text-primary transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50 rounded-md">
             {track.artist}
           </button>
         </main>
@@ -100,17 +100,17 @@ const Player: React.FC<PlayerProps> = ({ track, isPlaying, progress, onPlayPause
           </div>
           
           <div className="flex items-center justify-center gap-6 mt-4">
-            <button onClick={onPrev} aria-label="Previous track" className="text-text-secondary hover:text-primary transition-colors">
+            <button onClick={onPrev} aria-label="Previous track" className="text-text-secondary hover:text-primary transition-all duration-300 hover:scale-110">
               <SkipBackIcon className="w-8 h-8" />
             </button>
             <button
               onClick={onPlayPause}
               aria-label={isPlaying ? "Pause" : "Play"}
-              className="bg-primary text-background rounded-full w-20 h-20 flex items-center justify-center shadow-lg hover:bg-white/80 transition-all transform hover:scale-105"
+              className="bg-primary text-background rounded-full w-20 h-20 flex items-center justify-center shadow-lg hover:bg-white/80 transition-all transform hover:scale-110"
             >
               {isPlaying ? <PauseIcon className="w-10 h-10" /> : <PlayIcon className="w-10 h-10 pl-1" />}
             </button>
-            <button onClick={onNext} aria-label="Next track" className="text-text-secondary hover:text-primary transition-colors">
+            <button onClick={onNext} aria-label="Next track" className="text-text-secondary hover:text-primary transition-all duration-300 hover:scale-110">
               <SkipForwardIcon className="w-8 h-8" />
             </button>
           </div>
