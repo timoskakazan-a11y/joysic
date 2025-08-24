@@ -203,7 +203,7 @@ const App: React.FC = () => {
         title: currentTrack.title,
         artist: currentTrack.artist,
         album: 'Joysic',
-        artwork: [{ src: currentTrack.coverUrl, sizes: '512x512', type: currentTrack.coverUrlType || 'image/jpeg' }],
+        artwork: currentTrack.artwork,
       });
       mediaSession.setActionHandler('play', handlePlayPause);
       mediaSession.setActionHandler('pause', handlePlayPause);

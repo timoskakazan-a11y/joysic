@@ -1,3 +1,9 @@
+export interface Artwork {
+    src: string;
+    sizes: string;
+    type: string;
+}
+
 export interface Track {
   id: string;
   title: string;
@@ -5,6 +11,7 @@ export interface Track {
   artistId: string;
   lyrics: string;
   audioUrl: string;
+  artwork: Artwork[];
   coverUrl: string;
   coverUrlType: string;
 }
@@ -38,6 +45,21 @@ export interface Playlist {
   type: 'встроенный' | 'пользовательский';
 }
 
+export interface AirtableThumbnail {
+    url: string;
+    width: number;
+    height: number;
+}
+
+export interface AirtableAttachment {
+    url: string;
+    type: string;
+    thumbnails?: {
+        small?: AirtableThumbnail;
+        large?: AirtableThumbnail;
+    };
+}
+
 export interface AirtableTrackRecord {
   id: string;
   createdTime: string;
@@ -46,15 +68,7 @@ export interface AirtableTrackRecord {
     'Исполнитель'?: string[];
     'Слова'?: string;
     'Аудио'?: { url: string }[];
-    'Обложка трека'?: {
-      url: string;
-      type: string;
-      thumbnails?: {
-        large?: {
-          url: string;
-        };
-      };
-    }[];
+    'Обложка трека'?: AirtableAttachment[];
   };
 }
 

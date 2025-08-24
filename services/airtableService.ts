@@ -1,4 +1,4 @@
-import type { Track, Artist, AirtableTrackRecord, AirtableArtistRecord, User, AirtableUserRecord, Playlist, AirtablePlaylistRecord } from '../types';
+import type { Track, Artist, AirtableTrackRecord, AirtableArtistRecord, User, AirtableUserRecord, Playlist, AirtablePlaylistRecord, Artwork } from '../types';
 
 const AIRTABLE_BASE_ID = 'appuGObKAO57IqWRN';
 const MUSIC_TABLE_NAME = 'music';
@@ -186,14 +186,40 @@ export const updateUserLikes = async (user: User, likedTrackIds: string[], liked
 
 const mapAirtableRecordToTrack = (record: AirtableTrackRecord, artistMap: Map<string, string>): Track | null => {
     const fields = record.fields;
-    if (!fields['Название'] || !(fields['Аудио'] && fields['Аудио'][0] && fields['Аудио'][0].url) || !(fields['Обложка трека'] && fields['Обложка трека'][0] && fields['Обложка трека'][0].url) || !(fields['Исполнитель'] && fields['Исполнитель'][0])) {
+    const coverAttachment = fields['Обложка трека']?.[0];
+
+    if (!fields['Название'] || !(fields['Аудио']?.[0]?.url) || !coverAttachment?.url || !(fields['Исполнитель']?.[0])) {
         return null;
     }
     const artistId = fields['Исполнитель'][0];
     const artistName = artistMap.get(artistId) || 'Unknown Artist';
-    const coverAttachment = fields['Обложка трека'][0];
-    const coverUrl = (coverAttachment.thumbnails && coverAttachment.thumbnails.large && coverAttachment.thumbnails.large.url) || coverAttachment.url;
+    
     const coverUrlType = coverAttachment.type || 'image/jpeg';
+    
+    const artwork: Artwork[] = [];
+
+    if (coverAttachment.thumbnails?.large) {
+        artwork.push({
+            src: coverAttachment.thumbnails.large.url,
+            sizes: `${coverAttachment.thumbnails.large.width}x${coverAttachment.thumbnails.large.height}`,
+            type: coverUrlType
+        });
+    }
+    if (coverAttachment.thumbnails?.small) {
+        artwork.push({
+            src: coverAttachment.thumbnails.small.url,
+            sizes: `${coverAttachment.thumbnails.small.width}x${coverAttachment.thumbnails.small.height}`,
+            type: coverUrlType
+        });
+    }
+
+    artwork.push({
+        src: coverAttachment.url,
+        sizes: '512x512', // A sensible default for the original image whose size is unknown.
+        type: coverUrlType,
+    });
+    
+    const coverUrl = coverAttachment.thumbnails?.large?.url || coverAttachment.url;
 
     return { 
         id: record.id, 
@@ -202,8 +228,9 @@ const mapAirtableRecordToTrack = (record: AirtableTrackRecord, artistMap: Map<st
         artistId: artistId, 
         lyrics: fields['Слова'] || '', 
         audioUrl: fields['Аудио'][0].url, 
-        coverUrl: coverUrl,
-        coverUrlType: coverUrlType,
+        artwork,
+        coverUrl,
+        coverUrlType,
     };
 };
 
