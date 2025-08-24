@@ -286,7 +286,7 @@ export const fetchArtistDetails = async (artistId: string): Promise<Artist> => {
     const allPlaylistRecords: AirtablePlaylistRecord[] = allPlaylistsResponse.records || [];
 
     const artistAlbumRecords = allPlaylistRecords.filter(record => 
-        record.fields['Исполнитель']?.includes(artistId) &&
+        Array.isArray(record.fields['Исполнитель']) && record.fields['Исполнитель'].includes(artistId) &&
         record.fields['Альбом/Плейлист'] === 'альбом'
     );
     
