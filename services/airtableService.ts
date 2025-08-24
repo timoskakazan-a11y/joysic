@@ -44,7 +44,7 @@ export const loginUser = async (email: string, password: string): Promise<User> 
         method: 'GET'
     }, `?filterByFormula=${encodeURIComponent(formula)}`);
 
-    if (response.records.length === 0) {
+    if (!response.records || response.records.length === 0) {
         throw new Error('Неверный email или пароль');
     }
     return mapAirtableRecordToUser(response.records[0]);
@@ -54,7 +54,7 @@ export const registerUser = async (email: string, password: string, name: string
     // 1. Check if user already exists
     const checkFormula = `{Почта} = '${email}'`;
     const checkResponse = await fetchFromAirtable(USERS_TABLE_NAME, {}, `?filterByFormula=${encodeURIComponent(checkFormula)}`);
-    if (checkResponse.records.length > 0) {
+    if (checkResponse.records && checkResponse.records.length > 0) {
         throw new Error('Пользователь с таким email уже существует');
     }
 
@@ -77,7 +77,7 @@ export const registerUser = async (email: string, password: string, name: string
     
     // Use the fetched URL, or a fallback if not found
     let coverUrl = 'https://i.postimg.cc/FKncyR8c/24d35647-7d57-43ae-8dd6-82e5f299ecc7.png'; // Fallback
-    if (photoResponse.records.length > 0 && photoResponse.records[0].fields['Фото']?.[0]?.url) {
+    if (photoResponse.records && photoResponse.records.length > 0 && photoResponse.records[0].fields['Фото']?.[0]?.url) {
         coverUrl = photoResponse.records[0].fields['Фото'][0].url;
     }
 
@@ -109,7 +109,7 @@ export const registerUser = async (email: string, password: string, name: string
         const newArtistsPlaylistFormula = `{Название} = 'Новые артисты'`;
         const newArtistsPlaylistResponse = await fetchFromAirtable(PLAYLISTS_TABLE_NAME, {}, `?filterByFormula=${encodeURIComponent(newArtistsPlaylistFormula)}`);
 
-        if (newArtistsPlaylistResponse.records.length > 0) {
+        if (newArtistsPlaylistResponse.records && newArtistsPlaylistResponse.records.length > 0) {
             const playlistRecord = newArtistsPlaylistResponse.records[0];
             const playlistId = playlistRecord.id;
             const existingUsers = playlistRecord.fields['пользователи'] || [];
@@ -260,14 +260,19 @@ export const fetchTracks = async (): Promise<Track[]> => {
     fetchFromAirtable(ARTISTS_TABLE_NAME, {}, ''),
     fetchFromAirtable(MUSIC_TABLE_NAME, {}, '')
   ]);
-  const artistsData: { records: { id: string; fields: { 'Имя'?: string } }[] } = artistsResponse;
-  const tracksData: { records: AirtableTrackRecord[] } = tracksResponse;
+  const artistsData: { records?: { id: string; fields: { 'Имя'?: string } }[] } = artistsResponse;
+  const tracksData: { records?: AirtableTrackRecord[] } = tracksResponse;
 
   const artistMap = new Map<string, string>();
-  artistsData.records.forEach(record => {
-    if (record.fields['Имя']) artistMap.set(record.id, record.fields['Имя']);
-  });
+  if (artistsData.records) {
+    artistsData.records.forEach(record => {
+      if (record.fields['Имя']) artistMap.set(record.id, record.fields['Имя']);
+    });
+  }
 
+  if (!tracksData.records) {
+    return [];
+  }
   return tracksData.records.map(record => mapAirtableRecordToTrack(record, artistMap)).filter((track): track is Track => track !== null);
 };
 
@@ -305,9 +310,11 @@ export const fetchArtistDetails = async (artistId: string): Promise<Artist> => {
         // We need a map of all artists to correctly assign artist names to tracks, especially for collaborations.
         const artistsResponse = await fetchFromAirtable(ARTISTS_TABLE_NAME);
         const artistMap = new Map<string, string>();
-        artistsResponse.records.forEach((record: any) => {
-          if (record.fields['Имя']) artistMap.set(record.id, record.fields['Имя']);
-        });
+        if (artistsResponse.records) {
+            artistsResponse.records.forEach((record: any) => {
+              if (record.fields['Имя']) artistMap.set(record.id, record.fields['Имя']);
+            });
+        }
 
         allTracks = trackRecords
             .map(record => mapAirtableRecordToTrack(record, artistMap))
@@ -360,7 +367,7 @@ const mapAirtableRecordToPlaylist = (record: AirtablePlaylistRecord): Playlist |
 
 export const fetchPlaylistsForUser = async (user: User): Promise<{ playlists: Playlist[], likedAlbums: Playlist[], favoritesPlaylistId: string | null }> => {
     const response = await fetchFromAirtable(PLAYLISTS_TABLE_NAME, {});
-    const allPlaylistRecords: AirtablePlaylistRecord[] = response.records;
+    const allPlaylistRecords: AirtablePlaylistRecord[] = response.records || [];
 
     const userPlaylists: Playlist[] = [];
     const likedAlbums: Playlist[] = [];
