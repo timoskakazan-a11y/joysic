@@ -11,7 +11,7 @@ import LibraryPage from './components/LibraryPage';
 import PlaylistDetailPage from './components/PlaylistDetailPage';
 import BetaLockScreen from './components/BetaLockScreen';
 
-const BETA_LOCK_MODE: 'on' | 'off' = 'off'; // 'on' or 'off'
+const BETA_LOCK_MODE: 'off' | 'off' = 'off'; // 'on' or 'off'
 
 const App: React.FC = () => {
   const [isBetaLocked, setIsBetaLocked] = useState(false);
