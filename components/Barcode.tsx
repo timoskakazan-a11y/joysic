@@ -16,8 +16,8 @@ const Barcode: React.FC<BarcodeProps> = ({ value, className, options }) => {
       QRCode.toCanvas(canvasRef.current, value, {
         width: 192,
         color: {
-          dark: '#e5e7eb',
-          light: '#00000000'
+          dark: '#bb86fc', // Purple color for the QR code
+          light: '#FFFFFF'  // White background for the QR code
         },
         errorCorrectionLevel: 'H',
         ...options

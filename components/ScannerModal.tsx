@@ -16,7 +16,7 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ onClose, onScanSuccess }) =
 
     useEffect(() => {
         if (scannerRef.current && typeof Html5Qrcode !== 'undefined') {
-            const html5QrCode = new Html5Qrcode(scannerRef.current.id);
+            const html5QrCode = new Html5Qrcode(scannerRef.current.id, { formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE] });
             html5QrCodeRef.current = html5QrCode;
 
             const config = {
@@ -28,7 +28,6 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ onClose, onScanSuccess }) =
                         height: edge * 0.7
                     };
                 },
-                formatsToSupport: [ Html5QrcodeSupportedFormats.QR_CODE ]
             };
 
             const successCallback = (decodedText: string, decodedResult: any) => {
@@ -87,19 +86,18 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ onClose, onScanSuccess }) =
                     {error && <div className="absolute inset-0 bg-background flex items-center justify-center p-4 text-center text-red-400">{error}</div>}
                     
                     {/* Viewfinder overlay */}
-                    <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                        <div className="w-[70%] h-[70%] relative overflow-hidden">
-                            {/* Cutout effect */}
-                            <div className="absolute -top-1/2 -bottom-1/2 -left-1/2 -right-1/2 shadow-[0_0_0_2000px_rgba(0,0,0,0.5)]"></div>
+                    <div className="absolute inset-0 pointer-events-none flex items-center justify-center" aria-hidden="true">
+                        <div className="w-[70%] h-[70%] relative">
+                            <div className="absolute inset-0 shadow-[0_0_0_9999px_rgba(0,0,0,0.6)]"></div>
 
                             {/* Corner borders */}
-                            <div className="absolute top-0 left-0 w-10 h-10 border-t-[5px] border-l-[5px] border-white"></div>
-                            <div className="absolute top-0 right-0 w-10 h-10 border-t-[5px] border-r-[5px] border-white"></div>
-                            <div className="absolute bottom-0 left-0 w-10 h-10 border-b-[5px] border-l-[5px] border-white"></div>
-                            <div className="absolute bottom-0 right-0 w-10 h-10 border-b-[5px] border-r-[5px] border-white"></div>
+                            <div className="absolute top-0 left-0 w-10 h-10 border-t-4 border-l-4 border-white/90"></div>
+                            <div className="absolute top-0 right-0 w-10 h-10 border-t-4 border-r-4 border-white/90"></div>
+                            <div className="absolute bottom-0 left-0 w-10 h-10 border-b-4 border-l-4 border-white/90"></div>
+                            <div className="absolute bottom-0 right-0 w-10 h-10 border-b-4 border-r-4 border-white/90"></div>
 
                             {/* Scanning laser */}
-                            <div className="absolute top-0 left-0 right-0 h-1.5 bg-accent shadow-[0_0_10px_2px_theme(colors.accent)] animate-scan"></div>
+                            <div className="absolute top-0 left-0 right-0 h-1 bg-accent shadow-[0_0_15px_2px_theme(colors.accent)] animate-scan"></div>
                         </div>
                     </div>
                 </div>

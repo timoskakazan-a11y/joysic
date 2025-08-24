@@ -26,7 +26,7 @@ const JoycodeModal: React.FC<JoycodeModalProps> = ({ track, onClose }) => {
         <p className="text-text-secondary mb-6">{track.artist}</p>
         
         <div className="bg-surface-light p-2 rounded-2xl">
-          <div className="bg-background rounded-xl overflow-hidden flex justify-center items-center p-4">
+          <div className="bg-white rounded-xl overflow-hidden flex justify-center items-center p-4">
             <Barcode 
                 value={track.id} 
                 options={{
