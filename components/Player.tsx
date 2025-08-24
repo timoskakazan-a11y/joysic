@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { Track } from '../types';
-import { PlayIcon, PauseIcon, SkipBackIcon, SkipForwardIcon, ChevronDownIcon, HeartIcon, YouTubeIcon } from './IconComponents';
+import { PlayIcon, PauseIcon, SkipBackIcon, SkipForwardIcon, ChevronDownIcon, HeartIcon, YouTubeIcon, MoreOptionsIcon } from './IconComponents';
 import TrackCover from './TrackCover';
+import JoycodeModal from './JoycodeModal';
 
 interface PlayerProps {
   track: Track;
@@ -30,6 +31,10 @@ const formatTime = (seconds: number) => {
 const Player: React.FC<PlayerProps> = ({ track, isPlaying, progress, onPlayPause, onNext, onPrev, onSeek, onSelectArtist, onMinimize, isLiked, onToggleLike }) => {
   const [bgOpacity, setBgOpacity] = useState(0.5);
   const progressPercentage = (progress.duration > 0) ? (progress.currentTime / progress.duration) * 100 : 0;
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isJoycodeModalOpen, setIsJoycodeModalOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
 
   useEffect(() => {
     // Fade effect for background on track change
@@ -37,6 +42,18 @@ const Player: React.FC<PlayerProps> = ({ track, isPlaying, progress, onPlayPause
     const timer = setTimeout(() => setBgOpacity(0.5), 500);
     return () => clearTimeout(timer);
   }, [track.id]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setIsMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [menuRef]);
 
   const handleSeek = (event: React.ChangeEvent<HTMLInputElement>) => {
     onSeek(Number(event.target.value));
@@ -48,7 +65,13 @@ const Player: React.FC<PlayerProps> = ({ track, isPlaying, progress, onPlayPause
       }
   };
 
+  const handleShowJoycode = () => {
+    setIsJoycodeModalOpen(true);
+    setIsMenuOpen(false);
+  };
+
   return (
+    <>
     <div
       className="relative w-full h-full overflow-hidden bg-background"
     >
@@ -69,9 +92,26 @@ const Player: React.FC<PlayerProps> = ({ track, isPlaying, progress, onPlayPause
             <button onClick={onMinimize} className="text-text-secondary hover:text-primary transition-colors" aria-label="Minimize player">
                 <ChevronDownIcon className="w-8 h-8"/>
             </button>
-            <button onClick={onToggleLike} className={`${isLiked ? 'text-accent' : 'text-text-secondary'} hover:text-primary transition-colors`} aria-label="Like track">
-                <HeartIcon filled={isLiked} className="w-7 h-7" />
-            </button>
+            <div className="flex items-center gap-2">
+                <button onClick={onToggleLike} className={`${isLiked ? 'text-accent' : 'text-text-secondary'} hover:text-primary transition-colors p-2`} aria-label="Like track">
+                    <HeartIcon filled={isLiked} className="w-7 h-7" />
+                </button>
+                <div className="relative" ref={menuRef}>
+                    <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="text-text-secondary hover:text-primary transition-colors p-2" aria-label="More options">
+                        <MoreOptionsIcon className="w-7 h-7" />
+                    </button>
+                    {isMenuOpen && (
+                        <div className="absolute right-0 top-full mt-2 w-48 bg-surface-light rounded-lg shadow-lg z-10 animate-fadeInScaleUp py-1 origin-top-right">
+                            <button
+                                onClick={handleShowJoycode}
+                                className="w-full text-left px-4 py-2 text-sm text-text hover:bg-surface transition-colors flex items-center gap-3"
+                            >
+                                Показать Joycode
+                            </button>
+                        </div>
+                    )}
+                </div>
+            </div>
         </header>
 
         <main key={track.id} className="flex-grow w-full flex flex-col items-center justify-center text-center pt-4 animate-fadeInScaleUp">
@@ -177,6 +217,8 @@ const Player: React.FC<PlayerProps> = ({ track, isPlaying, progress, onPlayPause
         }
       `}</style>
     </div>
+    {isJoycodeModalOpen && <JoycodeModal track={track} onClose={() => setIsJoycodeModalOpen(false)} />}
+    </>
   );
 };
 

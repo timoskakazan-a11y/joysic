@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { fetchTracks, fetchArtistDetails, loginUser, registerUser, updateUserLikes, fetchPlaylistsForUser, incrementTrackStats, fetchBetaImage } from './services/airtableService';
-import type { Track, Artist, User, Playlist } from './types';
+import { fetchTracks, fetchArtistDetails, loginUser, registerUser, updateUserLikes, fetchPlaylistsForUser, incrementTrackStats, fetchBetaImage, fetchSimpleArtistsByIds } from './services/airtableService';
+import type { Track, Artist, User, Playlist, SimpleArtist } from './types';
 import Player from './components/Player';
 import ArtistPage from './components/ArtistPage';
 import MiniPlayer from './components/MiniPlayer';
@@ -10,8 +10,9 @@ import AuthPage from './components/AuthPage';
 import LibraryPage from './components/LibraryPage';
 import PlaylistDetailPage from './components/PlaylistDetailPage';
 import BetaLockScreen from './components/BetaLockScreen';
+import ScannerModal from './components/ScannerModal';
 
-const BETA_LOCK_MODE: 'off' | 'off' = 'off'; // 'on' or 'off'
+let BETA_LOCK_MODE: 'on' | 'off' = 'off'; // 'on' or 'off'
 
 const App: React.FC = () => {
   const [isBetaLocked, setIsBetaLocked] = useState(false);
@@ -25,6 +26,7 @@ const App: React.FC = () => {
   const [tracks, setTracks] = useState<Track[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [likedAlbums, setLikedAlbums] = useState<Playlist[]>([]);
+  const [likedArtists, setLikedArtists] = useState<SimpleArtist[]>([]);
   const [shuffledTracks, setShuffledTracks] = useState<Track[]>([]);
   const [currentTrackIndex, setCurrentTrackIndex] = useState<number | null>(null);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
@@ -37,6 +39,7 @@ const App: React.FC = () => {
   const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | null>(null);
   const [isArtistLoading, setIsArtistLoading] = useState<boolean>(false);
   const [isPlayerExpanded, setIsPlayerExpanded] = useState<boolean>(false);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const currentTrack = currentTrackIndex !== null && shuffledTracks.length > 0 ? shuffledTracks[currentTrackIndex] : null;
@@ -72,13 +75,15 @@ const App: React.FC = () => {
   const loadAppData = useCallback(async (currentUser: User) => {
     try {
       setIsLoading(true);
-      const [fetchedTracks, { playlists: fetchedPlaylists, likedAlbums: fetchedLikedAlbums, favoritesPlaylistId: favId }] = await Promise.all([
+      const [fetchedTracks, { playlists: fetchedPlaylists, likedAlbums: fetchedLikedAlbums, favoritesPlaylistId: favId }, fetchedLikedArtists] = await Promise.all([
         fetchTracks(),
-        fetchPlaylistsForUser(currentUser)
+        fetchPlaylistsForUser(currentUser),
+        fetchSimpleArtistsByIds(currentUser.likedArtistIds),
       ]);
       
       setFavoritesPlaylistId(favId);
       setTracks(fetchedTracks);
+      setLikedArtists(fetchedLikedArtists);
       
       const populateCollectionTracks = (collection: Playlist) => ({
         ...collection,
@@ -148,6 +153,7 @@ const App: React.FC = () => {
     setTracks([]);
     setPlaylists([]);
     setLikedAlbums([]);
+    setLikedArtists([]);
     setShuffledTracks([]);
     setCurrentTrackIndex(null);
     setIsPlaying(false);
@@ -228,6 +234,12 @@ const App: React.FC = () => {
         ...promises,
         updateUserLikes(user, updates, favoritesPlaylistId)
       ]);
+
+      if (type === 'artist') {
+        // Re-fetch liked artists to update the library page
+        const fetchedLikedArtists = await fetchSimpleArtistsByIds(updatedUser.likedArtistIds);
+        setLikedArtists(fetchedLikedArtists);
+      }
 
     } catch (error) {
       console.error('Failed to update likes:', error);
@@ -355,6 +367,18 @@ const App: React.FC = () => {
     setIsPlayerExpanded(false);
   };
   
+  const handlePlayTrackById = (trackId: string) => {
+    setIsScannerOpen(false);
+    const trackExists = tracks.some(t => t.id === trackId);
+    if (trackExists) {
+      handlePlayTrack(trackId, tracks);
+      setIsPlayerExpanded(true);
+    } else {
+      console.warn(`Track with ID ${trackId} not found from scan.`);
+      // Optionally, show a user-facing error here
+    }
+  };
+
   const handleSelectPlaylist = (playlist: Playlist) => {
     // Ensure playlist tracks have the latest stats
     const updatedPlaylist = {
@@ -418,7 +442,21 @@ const App: React.FC = () => {
             );
         case 'library':
         default:
-            return <LibraryPage user={user} playlists={playlists} likedAlbums={likedAlbums} onSelectPlaylist={handleSelectPlaylist} onShufflePlayAll={handleShufflePlayAll} onLogout={handleLogout} />;
+            return <LibraryPage 
+                user={user} 
+                playlists={playlists} 
+                likedAlbums={likedAlbums} 
+                likedArtists={likedArtists}
+                tracks={tracks}
+                onSelectPlaylist={handleSelectPlaylist} 
+                onSelectArtist={handleSelectArtist}
+                onPlayTrack={(trackId) => handlePlayTrack(trackId, tracks)}
+                onShufflePlayAll={handleShufflePlayAll} 
+                onLogout={handleLogout} 
+                onOpenScanner={() => setIsScannerOpen(true)}
+                currentTrackId={currentTrack?.id}
+                isPlaying={isPlaying}
+            />;
     }
   }
 
@@ -450,6 +488,8 @@ const App: React.FC = () => {
           </div>
         </>
       )}
+      
+      {isScannerOpen && <ScannerModal onClose={() => setIsScannerOpen(false)} onScanSuccess={handlePlayTrackById} />}
 
       <audio ref={audioRef} onTimeUpdate={handleTimeUpdate} onLoadedData={handleTimeUpdate} onEnded={handleNextTrack} className="hidden"/>
     </div>

@@ -1,3 +1,4 @@
+
 export interface Artwork {
     src: string;
     sizes: string;
@@ -36,6 +37,12 @@ export interface User {
   likedTrackIds: string[];
   likedArtistIds: string[];
   favoriteCollectionIds: string[];
+}
+
+export interface SimpleArtist {
+  id: string;
+  name: string;
+  photoUrl?: string;
 }
 
 export interface Playlist {

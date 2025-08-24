@@ -1,4 +1,5 @@
-import type { Track, Artist, AirtableTrackRecord, AirtableArtistRecord, User, AirtableUserRecord, Playlist, AirtablePlaylistRecord, Artwork, AirtableAttachment } from '../types';
+
+import type { Track, Artist, AirtableTrackRecord, AirtableArtistRecord, User, AirtableUserRecord, Playlist, AirtablePlaylistRecord, Artwork, AirtableAttachment, SimpleArtist } from '../types';
 
 const AIRTABLE_BASE_ID = 'appuGObKAO57IqWRN';
 const MUSIC_TABLE_NAME = 'music';
@@ -446,4 +447,24 @@ export const fetchBetaImage = async (): Promise<string | null> => {
         console.error('Error fetching beta image from Airtable:', error);
     }
     return null;
+};
+
+const mapAirtableRecordToSimpleArtist = (record: AirtableArtistRecord): SimpleArtist => {
+    const photoAttachment = record.fields['Фото']?.[0];
+    const photoUrl = photoAttachment?.thumbnails?.large?.url || photoAttachment?.url;
+    return {
+        id: record.id,
+        name: record.fields['Имя'] || 'Unknown Artist',
+        photoUrl: photoUrl,
+    };
+};
+
+export const fetchSimpleArtistsByIds = async (artistIds: string[]): Promise<SimpleArtist[]> => {
+    if (!artistIds || artistIds.length === 0) {
+        return [];
+    }
+    const formula = "OR(" + artistIds.map(id => `RECORD_ID() = '${id}'`).join(',') + ")";
+    const response = await fetchFromAirtable(ARTISTS_TABLE_NAME, {}, `?filterByFormula=${encodeURIComponent(formula)}`);
+    const artistRecords: AirtableArtistRecord[] = response.records || [];
+    return artistRecords.map(mapAirtableRecordToSimpleArtist);
 };
