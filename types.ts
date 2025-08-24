@@ -43,6 +43,8 @@ export interface Playlist {
   name: string;
   description: string;
   coverUrl: string;
+  coverVideoUrl?: string;
+  coverType: 'image' | 'video';
   trackIds: string[];
   tracks: Track[];
   isFavorites: boolean;
@@ -117,7 +119,7 @@ export interface AirtablePlaylistRecord {
   fields: {
     'Название'?: string;
     'Описание'?: string;
-    'Обложка'?: { url: string }[];
+    'Обложка'?: AirtableAttachment[];
     'Песни'?: string[];
     'пользователи'?: string[];
     'Тип'?: 'встроенный' | 'пользовательский';

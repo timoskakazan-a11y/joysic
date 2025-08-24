@@ -101,7 +101,11 @@ const ArtistPage: React.FC<ArtistPageProps> = ({ artist, onBack, onPlayTrack, on
                         return (
                         <div key={album.id} className="group">
                             <div className="relative aspect-square w-full rounded-2xl shadow-lg overflow-hidden bg-surface cursor-pointer" onClick={() => onSelectPlaylist(album)}>
-                                <TrackCover src={album.coverUrl} alt={album.name} className="w-full h-full transition-transform duration-500 group-hover:scale-110" />
+                                {album.coverType === 'video' && album.coverVideoUrl ? (
+                                    <video src={album.coverVideoUrl} poster={album.coverUrl} autoPlay loop muted playsInline className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                                ) : (
+                                    <img src={album.coverUrl} alt={album.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                                )}
                                 <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                             </div>
                             <div className="mt-3 flex justify-between items-start">

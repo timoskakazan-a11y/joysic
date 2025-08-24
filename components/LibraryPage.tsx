@@ -14,7 +14,11 @@ interface LibraryPageProps {
 const PlaylistCard: React.FC<{ playlist: Playlist; onSelect: () => void }> = ({ playlist, onSelect }) => (
   <div onClick={onSelect} className="group cursor-pointer">
     <div className="relative aspect-square w-full rounded-2xl shadow-lg overflow-hidden bg-surface">
-      <img src={playlist.coverUrl} alt={playlist.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+      {playlist.coverType === 'video' && playlist.coverVideoUrl ? (
+        <video src={playlist.coverVideoUrl} poster={playlist.coverUrl} autoPlay loop muted playsInline className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+      ) : (
+        <img src={playlist.coverUrl} alt={playlist.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+      )}
     </div>
     <div className="mt-3">
       <h3 className="font-bold text-primary truncate">{playlist.name}</h3>

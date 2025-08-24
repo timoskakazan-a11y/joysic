@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { fetchTracks, fetchArtistDetails, loginUser, registerUser, updateUserLikes, fetchPlaylistsForUser, incrementTrackStats, fetchBetaImage } from './services/airtableService';
 import type { Track, Artist, User, Playlist } from './types';
@@ -9,6 +10,8 @@ import AuthPage from './components/AuthPage';
 import LibraryPage from './components/LibraryPage';
 import PlaylistDetailPage from './components/PlaylistDetailPage';
 import BetaLockScreen from './components/BetaLockScreen';
+
+const BETA_LOCK_MODE: 'on' | 'off' = 'off'; // 'on' or 'off'
 
 const App: React.FC = () => {
   const [isBetaLocked, setIsBetaLocked] = useState(false);
@@ -40,7 +43,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const checkBetaStatus = async () => {
-      if (window.location.hostname === 'joysic.netlify.app') {
+      if (BETA_LOCK_MODE === 'on' && window.location.hostname === 'joysic.netlify.app') {
         setIsBetaLocked(true);
         try {
           const url = await fetchBetaImage();
@@ -96,7 +99,7 @@ const App: React.FC = () => {
       setError('Failed to load data. Please check your connection and Airtable configuration.');
       console.error(err);
     } finally {
-      setTimeout(() => setIsLoading(false), 1500);
+      setIsLoading(false);
     }
   }, []);
   

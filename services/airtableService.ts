@@ -1,4 +1,4 @@
-import type { Track, Artist, AirtableTrackRecord, AirtableArtistRecord, User, AirtableUserRecord, Playlist, AirtablePlaylistRecord, Artwork } from '../types';
+import type { Track, Artist, AirtableTrackRecord, AirtableArtistRecord, User, AirtableUserRecord, Playlist, AirtablePlaylistRecord, Artwork, AirtableAttachment } from '../types';
 
 const AIRTABLE_BASE_ID = 'appuGObKAO57IqWRN';
 const MUSIC_TABLE_NAME = 'music';
@@ -344,18 +344,32 @@ export const fetchArtistDetails = async (artistId: string): Promise<Artist> => {
 
 const mapAirtableRecordToPlaylist = (record: AirtablePlaylistRecord): Playlist | null => {
     const fields = record.fields;
-    if (!fields['Название'] || !fields['Обложка']?.[0]?.url) {
+    const coverAttachment = fields['Обложка']?.[0];
+
+    if (!fields['Название'] || !coverAttachment) {
         return null;
     }
     const type = fields['Тип'] || 'пользовательский';
-    // A 'built-in' playlist must always be of collection type 'playlist', regardless of Airtable data.
     const collectionType = type === 'встроенный' ? 'плейлист' : (fields['Альбом/Плейлист'] || 'плейлист');
+
+    let coverUrl = '';
+    let coverVideoUrl: string | undefined = undefined;
+    const coverType: 'image' | 'video' = coverAttachment.type?.startsWith('video') ? 'video' : 'image';
+
+    if (coverType === 'video') {
+        coverVideoUrl = coverAttachment.url;
+        coverUrl = coverAttachment.thumbnails?.large?.url || '';
+    } else {
+        coverUrl = coverAttachment.thumbnails?.large?.url || coverAttachment.url;
+    }
 
     return {
         id: record.id,
         name: fields['Название'],
         description: fields['Описание'] || '',
-        coverUrl: fields['Обложка'][0].url,
+        coverUrl,
+        coverVideoUrl,
+        coverType,
         trackIds: fields['Песни'] || [],
         tracks: [], // to be populated later
         isFavorites: false, // will be set later

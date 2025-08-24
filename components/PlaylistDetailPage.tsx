@@ -54,11 +54,11 @@ const PlaylistDetailPage: React.FC<PlaylistDetailPageProps> = ({ playlist, onBac
         </button>
         <header className="flex flex-col md:flex-row items-center md:items-start gap-6 md:gap-10 mb-8 mt-16 md:mt-24">
             <div className="relative w-40 h-40 md:w-48 md:h-48 rounded-2xl bg-surface shadow-lg overflow-hidden flex-shrink-0 border-4 border-background">
-                <TrackCover 
-                    src={playlist.coverUrl} 
-                    alt={playlist.name} 
-                    className="absolute inset-0 w-full h-full"
-                />
+                {playlist.coverType === 'video' && playlist.coverVideoUrl ? (
+                    <video src={playlist.coverVideoUrl} poster={playlist.coverUrl} autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover" />
+                ) : (
+                    <img src={playlist.coverUrl} alt={playlist.name} className="absolute inset-0 w-full h-full object-cover" />
+                )}
             </div>
             <div className="text-center md:text-left flex flex-col md:h-48">
                 <div className="flex-grow overflow-hidden">
