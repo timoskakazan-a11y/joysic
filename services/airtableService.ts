@@ -34,7 +34,7 @@ const mapAirtableRecordToUser = (record: AirtableUserRecord): User => {
         name: record.fields['Имя'],
         likedTrackIds: record.fields['Лайки песен'] || [],
         likedArtistIds: record.fields['Любимые исполнители'] || [],
-        favoritesPlaylistId: record.fields['Любимый плейлист']?.[0],
+        favoriteCollectionIds: record.fields['Любимый плейлист'] || [],
     };
 };
 
@@ -151,31 +151,34 @@ export const registerUser = async (email: string, password: string, name: string
     return mapAirtableRecordToUser(fullUserRecord);
 };
 
-export const updateUserLikes = async (user: User, likedTrackIds: string[], likedArtistIds: string[]): Promise<void> => {
-    const promises: Promise<any>[] = [];
-    
-    // Update user's liked lists
-    promises.push(fetchFromAirtable(USERS_TABLE_NAME, {
-        method: 'PATCH',
-        body: JSON.stringify({
-            records: [{
-                id: user.id,
-                fields: {
-                    'Лайки песен': likedTrackIds,
-                    'Любимые исполнители': likedArtistIds,
-                }
-            }]
-        })
-    }));
+export const updateUserLikes = async (user: User, updates: { likedTrackIds?: string[], likedArtistIds?: string[], favoriteCollectionIds?: string[] }, favoritesPlaylistId?: string | null): Promise<void> => {
+    const fieldsToUpdate: { [key: string]: string[] } = {};
 
-    // Update the "Favorites" playlist with the liked tracks
-    if (user.favoritesPlaylistId) {
+    if (updates.likedTrackIds !== undefined) fieldsToUpdate['Лайки песен'] = updates.likedTrackIds;
+    if (updates.likedArtistIds !== undefined) fieldsToUpdate['Любимые исполнители'] = updates.likedArtistIds;
+    if (updates.favoriteCollectionIds !== undefined) fieldsToUpdate['Любимый плейлист'] = updates.favoriteCollectionIds;
+
+    const promises: Promise<any>[] = [];
+
+    if (Object.keys(fieldsToUpdate).length > 0) {
+        promises.push(fetchFromAirtable(USERS_TABLE_NAME, {
+            method: 'PATCH',
+            body: JSON.stringify({
+                records: [{
+                    id: user.id,
+                    fields: fieldsToUpdate
+                }]
+            })
+        }));
+    }
+
+    if (updates.likedTrackIds && favoritesPlaylistId) {
         promises.push(fetchFromAirtable(PLAYLISTS_TABLE_NAME, {
             method: 'PATCH',
             body: JSON.stringify({
                 records: [{
-                    id: user.favoritesPlaylistId,
-                    fields: { 'Песни': likedTrackIds }
+                    id: favoritesPlaylistId,
+                    fields: { 'Песни': updates.likedTrackIds }
                 }]
             })
         }));
@@ -183,6 +186,7 @@ export const updateUserLikes = async (user: User, likedTrackIds: string[], liked
 
     await Promise.all(promises);
 };
+
 
 export const incrementTrackStats = async (trackId: string, field: 'Лайки' | 'Прослушивания', currentValue: number, increment: number = 1): Promise<void> => {
     await fetchFromAirtable(MUSIC_TABLE_NAME, {
@@ -247,6 +251,7 @@ const mapAirtableRecordToTrack = (record: AirtableTrackRecord, artistMap: Map<st
         coverUrlType,
         likes: fields['Лайки'] || 0,
         listens: fields['Прослушивания'] || 0,
+        youtubeClipUrl: fields['клип'],
     };
 };
 
@@ -353,53 +358,56 @@ const mapAirtableRecordToPlaylist = (record: AirtablePlaylistRecord): Playlist |
     };
 };
 
-export const fetchPlaylistsForUser = async (userId: string): Promise<Playlist[]> => {
+export const fetchPlaylistsForUser = async (user: User): Promise<{ playlists: Playlist[], likedAlbums: Playlist[], favoritesPlaylistId: string | null }> => {
     const response = await fetchFromAirtable(PLAYLISTS_TABLE_NAME, {});
     const allPlaylistRecords: AirtablePlaylistRecord[] = response.records;
 
-    const playlistsMap = new Map<string, AirtablePlaylistRecord>();
+    const userPlaylists: Playlist[] = [];
+    const likedAlbums: Playlist[] = [];
+    let favoritesPlaylist: Playlist | null = null;
+    
+    const userFavoriteCollections = allPlaylistRecords
+      .filter(record => user.favoriteCollectionIds.includes(record.id))
+      .map(mapAirtableRecordToPlaylist)
+      .filter((p): p is Playlist => p !== null);
 
-    // 1. Add all playlists the user is directly linked to
-    allPlaylistRecords
-        .filter(record => record.fields['пользователи']?.includes(userId))
-        .forEach(record => playlistsMap.set(record.id, record));
+    for (const collection of userFavoriteCollections) {
+      if (collection.name === 'Любимое' && collection.type === 'встроенный') {
+        favoritesPlaylist = collection;
+      } else if (collection.collectionType === 'альбом') {
+        likedAlbums.push(collection);
+      }
+    }
 
-    // 2. Find and add the shared "Новые артисты" playlist.
-    // Also, link the user to it in Airtable if they aren't already.
-    const newArtistsPlaylist = allPlaylistRecords.find(record => record.fields['Название'] === 'Новые артисты');
-    if (newArtistsPlaylist) {
-        const isUserAlreadyLinked = newArtistsPlaylist.fields['пользователи']?.includes(userId);
+    if (favoritesPlaylist) {
+        userPlaylists.push(favoritesPlaylist);
+    }
 
-        // If the user isn't linked in Airtable, add them now.
-        // This handles existing users who were registered before this playlist was created.
+    // Find and add the shared "Новые артисты" playlist.
+    const newArtistsPlaylistRecord = allPlaylistRecords.find(record => record.fields['Название'] === 'Новые артисты');
+    if (newArtistsPlaylistRecord) {
+        const isUserAlreadyLinked = newArtistsPlaylistRecord.fields['пользователи']?.includes(user.id);
         if (!isUserAlreadyLinked) {
             try {
-                const playlistId = newArtistsPlaylist.id;
-                const existingUsers = newArtistsPlaylist.fields['пользователи'] || [];
-                const updatedUsers = [...new Set([...existingUsers, userId])];
-                
-                // Asynchronously update the record in the background.
-                // We don't await this so it doesn't slow down the initial load.
+                const playlistId = newArtistsPlaylistRecord.id;
+                const existingUsers = newArtistsPlaylistRecord.fields['пользователи'] || [];
+                const updatedUsers = [...new Set([...existingUsers, user.id])];
                 fetchFromAirtable(PLAYLISTS_TABLE_NAME, {
                     method: 'PATCH',
-                    body: JSON.stringify({
-                        records: [{
-                            id: playlistId,
-                            fields: { 'пользователи': updatedUsers }
-                        }]
-                    })
+                    body: JSON.stringify({ records: [{ id: playlistId, fields: { 'пользователи': updatedUsers } }] })
                 }).catch(e => console.error('Background update of "Новые артисты" playlist failed:', e));
-
             } catch (e) {
                 console.error('Failed to prepare update for "Новые артисты" playlist:', e);
             }
         }
-        
-        // Always add the playlist to the user's list for immediate UI visibility.
-        playlistsMap.set(newArtistsPlaylist.id, newArtistsPlaylist);
+        const mappedNewArtistsPlaylist = mapAirtableRecordToPlaylist(newArtistsPlaylistRecord);
+        if (mappedNewArtistsPlaylist) {
+            userPlaylists.push(mappedNewArtistsPlaylist);
+        }
     }
     
-    return Array.from(playlistsMap.values())
-        .map(mapAirtableRecordToPlaylist)
-        .filter((p): p is Playlist => p !== null && p.collectionType === 'плейлист');
+    // De-duplicate in case "Любимое" is also linked via the 'пользователи' field
+    const finalPlaylists = Array.from(new Map(userPlaylists.map(p => [p.id, p])).values());
+
+    return { playlists: finalPlaylists, likedAlbums, favoritesPlaylistId: favoritesPlaylist ? favoritesPlaylist.id : null };
 };

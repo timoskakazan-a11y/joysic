@@ -11,13 +11,15 @@ interface PlaylistDetailPageProps {
   isPlaying: boolean;
   onPlayPause: () => void;
   likedTrackIds: string[];
-  onToggleLikeTrack: (trackId: string) => void;
+  favoriteCollectionIds: string[];
+  onToggleLike: (type: 'track' | 'album', id: string) => void;
 }
 
-const PlaylistDetailPage: React.FC<PlaylistDetailPageProps> = ({ playlist, onBack, onPlayTrack, currentTrackId, isPlaying, onPlayPause, likedTrackIds, onToggleLikeTrack }) => {
+const PlaylistDetailPage: React.FC<PlaylistDetailPageProps> = ({ playlist, onBack, onPlayTrack, currentTrackId, isPlaying, onPlayPause, likedTrackIds, favoriteCollectionIds, onToggleLike }) => {
   
   const isPlaylistActive = playlist.trackIds.includes(currentTrackId || '');
   const isCurrentlyPlaying = isPlaylistActive && isPlaying;
+  const isAlbumLiked = playlist.collectionType === 'альбом' && favoriteCollectionIds.includes(playlist.id);
 
   const sortedTracks = useMemo(() => 
     [...playlist.tracks].sort((a, b) => (b.listens || 0) - (a.listens || 0)),
@@ -67,11 +69,11 @@ const PlaylistDetailPage: React.FC<PlaylistDetailPageProps> = ({ playlist, onBac
                         <p className="text-text-secondary whitespace-pre-wrap leading-relaxed max-w-prose">{playlist.description}</p>
                     )}
                 </div>
-                <div className="flex-shrink-0 mt-4">
+                <div className="flex-shrink-0 mt-4 flex items-center justify-center md:justify-start gap-4">
                      <button 
                         onClick={handlePlayPauseClick}
                         disabled={playlist.tracks.length === 0}
-                        className={`font-bold px-8 py-3 rounded-full transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 mx-auto md:mx-0 ${
+                        className={`font-bold px-8 py-3 rounded-full transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 ${
                             isCurrentlyPlaying
                               ? 'bg-white text-background hover:bg-white/90 transform scale-105'
                               : 'bg-accent text-background hover:bg-opacity-80'
@@ -80,6 +82,15 @@ const PlaylistDetailPage: React.FC<PlaylistDetailPageProps> = ({ playlist, onBac
                         <ButtonIcon className="w-5 h-5"/>
                         <span>{buttonText}</span>
                     </button>
+                    {playlist.collectionType === 'альбом' && playlist.type !== 'встроенный' && (
+                        <button
+                          onClick={() => onToggleLike('album', playlist.id)}
+                          className={`${isAlbumLiked ? 'text-accent' : 'text-text-secondary'} bg-surface/50 backdrop-blur-sm hover:text-primary hover:bg-surface w-12 h-12 rounded-full flex items-center justify-center transition-colors`}
+                          aria-label={isAlbumLiked ? 'Убрать лайк' : 'Поставить лайк'}
+                        >
+                            <HeartIcon filled={isAlbumLiked} className="w-6 h-6" />
+                        </button>
+                    )}
                 </div>
             </div>
         </header>
@@ -119,7 +130,7 @@ const PlaylistDetailPage: React.FC<PlaylistDetailPageProps> = ({ playlist, onBac
                 </div>
                 <div className="flex items-center gap-4 text-text-secondary text-sm">
                     <button 
-                      onClick={(e) => { e.stopPropagation(); onToggleLikeTrack(track.id); }} 
+                      onClick={(e) => { e.stopPropagation(); onToggleLike('track', track.id); }} 
                       className={`${isTrackLiked ? 'text-accent' : 'text-text-secondary'} hover:text-primary transition-colors`}
                       aria-label={isTrackLiked ? 'Убрать лайк' : 'Поставить лайк'}
                     >

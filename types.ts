@@ -16,6 +16,7 @@ export interface Track {
   coverUrlType: string;
   likes: number;
   listens: number;
+  youtubeClipUrl?: string;
 }
 
 export interface Artist {
@@ -34,7 +35,7 @@ export interface User {
   name: string;
   likedTrackIds: string[];
   likedArtistIds: string[];
-  favoritesPlaylistId?: string;
+  favoriteCollectionIds: string[];
 }
 
 export interface Playlist {
@@ -76,6 +77,7 @@ export interface AirtableTrackRecord {
     'Обложка трека'?: AirtableAttachment[];
     'Лайки'?: number;
     'Прослушивания'?: number;
+    'клип'?: string;
   };
 }
 

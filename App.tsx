@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { fetchTracks, fetchArtistDetails, loginUser, registerUser, updateUserLikes, fetchPlaylistsForUser, incrementTrackStats } from './services/airtableService';
 import type { Track, Artist, User, Playlist } from './types';
@@ -13,9 +12,11 @@ import PlaylistDetailPage from './components/PlaylistDetailPage';
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
-
+  
+  const [favoritesPlaylistId, setFavoritesPlaylistId] = useState<string | undefined>();
   const [tracks, setTracks] = useState<Track[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [likedAlbums, setLikedAlbums] = useState<Playlist[]>([]);
   const [shuffledTracks, setShuffledTracks] = useState<Track[]>([]);
   const [currentTrackIndex, setCurrentTrackIndex] = useState<number | null>(null);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
@@ -43,20 +44,28 @@ const App: React.FC = () => {
   const loadAppData = useCallback(async (currentUser: User) => {
     try {
       setIsLoading(true);
-      const [fetchedTracks, fetchedPlaylists] = await Promise.all([
+      const [fetchedTracks, { playlists: fetchedPlaylists, likedAlbums: fetchedLikedAlbums, favoritesPlaylistId: favId }] = await Promise.all([
         fetchTracks(),
-        fetchPlaylistsForUser(currentUser.id)
+        fetchPlaylistsForUser(currentUser)
       ]);
       
+      setFavoritesPlaylistId(favId);
       setTracks(fetchedTracks);
       
+      const populateCollectionTracks = (collection: Playlist) => ({
+        ...collection,
+        tracks: collection.trackIds.map(tid => fetchedTracks.find(t => t.id === tid)).filter((t): t is Track => t !== undefined),
+      });
+
       const playlistsWithTracks = fetchedPlaylists.map(p => ({
-        ...p,
-        tracks: p.trackIds.map(tid => fetchedTracks.find(t => t.id === tid)).filter((t): t is Track => t !== undefined),
-        isFavorites: p.id === currentUser.favoritesPlaylistId,
+        ...populateCollectionTracks(p),
+        isFavorites: p.id === favId,
       })).sort((a, b) => (a.isFavorites === b.isFavorites) ? 0 : a.isFavorites ? -1 : 1);
       
+      const likedAlbumsWithTracks = fetchedLikedAlbums.map(populateCollectionTracks);
+
       setPlaylists(playlistsWithTracks);
+      setLikedAlbums(likedAlbumsWithTracks);
       setError(null);
     } catch (err) {
       setError('Failed to load data. Please check your connection and Airtable configuration.');
@@ -110,75 +119,94 @@ const App: React.FC = () => {
     localStorage.removeItem('joysicUser');
     setTracks([]);
     setPlaylists([]);
+    setLikedAlbums([]);
     setShuffledTracks([]);
     setCurrentTrackIndex(null);
     setIsPlaying(false);
     setView('library');
+    setFavoritesPlaylistId(undefined);
   };
 
-    const handleToggleLike = async (type: 'track' | 'artist', id: string) => {
+  const handleToggleLike = async (type: 'track' | 'artist' | 'album', id: string) => {
     if (!user) return;
 
     const originalUser = { ...user };
-    const originalPlaylists = JSON.parse(JSON.stringify(playlists));
-    const originalTracks = JSON.parse(JSON.stringify(tracks));
-
+    let updates: { likedTrackIds?: string[], likedArtistIds?: string[], favoriteCollectionIds?: string[] } = {};
     let updatedUser: User;
 
     if (type === 'track') {
         const isLiked = user.likedTrackIds.includes(id);
         const updatedLikedIds = isLiked ? user.likedTrackIds.filter(likedId => likedId !== id) : [...user.likedTrackIds, id];
         updatedUser = { ...user, likedTrackIds: updatedLikedIds };
-
+        updates.likedTrackIds = updatedLikedIds;
+        
+        // Optimistic UI update for track likes
         const trackToUpdate = tracks.find(t => t.id === id);
         if (trackToUpdate) {
             const newLikeCount = (trackToUpdate.likes || 0) + (isLiked ? -1 : 1);
             const updatedTrack = { ...trackToUpdate, likes: newLikeCount };
             const newTracks = tracks.map(t => t.id === id ? updatedTrack : t);
             setTracks(newTracks);
-
-            setPlaylists(currentPlaylists =>
-                currentPlaylists.map(p => {
-                    let newPlaylistTracks = p.tracks.map(t => t.id === id ? updatedTrack : t);
-                    if (p.id === user.favoritesPlaylistId) {
-                        if (isLiked) { // Unliking
-                            newPlaylistTracks = newPlaylistTracks.filter(t => t.id !== id);
-                        } else { // Liking
-                            if (!p.trackIds.includes(id)) {
-                                newPlaylistTracks = [...newPlaylistTracks, updatedTrack];
-                            }
-                        }
-                    }
-                    return { ...p, tracks: newPlaylistTracks };
-                })
-            );
+            const updateCollections = (collections: Playlist[]) => collections.map(p => ({
+                ...p,
+                tracks: p.tracks.map(t => t.id === id ? updatedTrack : t)
+            }));
+            setPlaylists(updateCollections);
+            setLikedAlbums(updateCollections);
         }
-    } else { // artist
+    } else if (type === 'artist') {
         const isLiked = user.likedArtistIds.includes(id);
         const updatedLikedIds = isLiked ? user.likedArtistIds.filter(likedId => likedId !== id) : [...user.likedArtistIds, id];
         updatedUser = { ...user, likedArtistIds: updatedLikedIds };
+        updates.likedArtistIds = updatedLikedIds;
+    } else { // album
+        const isLiked = user.favoriteCollectionIds.includes(id);
+        const updatedCollectionIds = isLiked ? user.favoriteCollectionIds.filter(cid => cid !== id) : [...user.favoriteCollectionIds, id];
+        updatedUser = { ...user, favoriteCollectionIds: updatedCollectionIds };
+        updates.favoriteCollectionIds = updatedCollectionIds;
+        
+        // Optimistic UI update for album likes
+        if (isLiked) {
+          setLikedAlbums(prev => prev.filter(a => a.id !== id));
+        } else {
+          let albumToAdd: Playlist | undefined;
+          if (selectedArtist) {
+            albumToAdd = selectedArtist.albums.find(a => a.id === id);
+          }
+          if (!albumToAdd) {
+            const allCollections = [...playlists, ...likedAlbums];
+            albumToAdd = allCollections.find(c => c.id === id);
+          }
+          if (albumToAdd) {
+            setLikedAlbums(prev => [...prev, albumToAdd!]);
+          }
+        }
     }
 
     setUser(updatedUser);
     localStorage.setItem('joysicUser', JSON.stringify(updatedUser));
 
     try {
-      const promises = [updateUserLikes(user, updatedUser.likedTrackIds, updatedUser.likedArtistIds)];
+      const promises: Promise<any>[] = [];
       if (type === 'track') {
-          const trackToUpdate = originalTracks.find((t: Track) => t.id === id);
+          const trackToUpdate = tracks.find(t => t.id === id);
           if (trackToUpdate) {
             const isLiked = originalUser.likedTrackIds.includes(id);
             promises.push(incrementTrackStats(id, 'Лайки', trackToUpdate.likes || 0, isLiked ? -1 : 1));
           }
       }
-      await Promise.all(promises);
+      
+      await Promise.all([
+        ...promises,
+        updateUserLikes(user, updates, favoritesPlaylistId)
+      ]);
 
     } catch (error) {
       console.error('Failed to update likes:', error);
       setUser(originalUser);
-      setPlaylists(originalPlaylists);
-      setTracks(originalTracks);
       localStorage.setItem('joysicUser', JSON.stringify(originalUser));
+      // Revert UI changes on failure
+      loadAppData(originalUser);
     }
   };
 
@@ -283,12 +311,12 @@ const App: React.FC = () => {
             const newTracks = tracks.map(t => t.id === trackId ? updatedTrack : t);
             setTracks(newTracks);
 
-            setPlaylists(currentPlaylists =>
-                currentPlaylists.map(p => ({
-                    ...p,
-                    tracks: p.tracks.map(t => t.id === trackId ? updatedTrack : t)
-                }))
-            );
+            const updateCollections = (collections: Playlist[]) => collections.map(p => ({
+                ...p,
+                tracks: p.tracks.map(t => t.id === trackId ? updatedTrack : t)
+            }));
+            setPlaylists(updateCollections);
+            setLikedAlbums(updateCollections);
 
             incrementTrackStats(trackId, 'Прослушивания', trackToUpdate.listens || 0).catch(err => {
                 console.error("Failed to update listen count:", err);
@@ -338,10 +366,10 @@ const App: React.FC = () => {
                     currentTrackId={currentTrack?.id}
                     isPlaying={isPlaying}
                     likedArtistIds={user.likedArtistIds}
-                    onToggleLikeArtist={(artistId) => handleToggleLike('artist', artistId)}
                     onSelectPlaylist={handleSelectPlaylist}
                     likedTrackIds={user.likedTrackIds}
-                    onToggleLikeTrack={(trackId) => handleToggleLike('track', trackId)}
+                    favoriteCollectionIds={user.favoriteCollectionIds}
+                    onToggleLike={handleToggleLike}
                 />
             );
         case 'playlistDetail':
@@ -354,12 +382,13 @@ const App: React.FC = () => {
                     isPlaying={isPlaying}
                     onPlayPause={handlePlayPause}
                     likedTrackIds={user.likedTrackIds}
-                    onToggleLikeTrack={(trackId) => handleToggleLike('track', trackId)}
+                    favoriteCollectionIds={user.favoriteCollectionIds}
+                    onToggleLike={handleToggleLike}
                 />
             );
         case 'library':
         default:
-            return <LibraryPage user={user} playlists={playlists} onSelectPlaylist={handleSelectPlaylist} onShufflePlayAll={handleShufflePlayAll} onLogout={handleLogout} />;
+            return <LibraryPage user={user} playlists={playlists} likedAlbums={likedAlbums} onSelectPlaylist={handleSelectPlaylist} onShufflePlayAll={handleShufflePlayAll} onLogout={handleLogout} />;
     }
   }
 

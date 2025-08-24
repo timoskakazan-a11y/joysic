@@ -1,14 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { Track } from '../types';
-import { PlayIcon, PauseIcon, SkipBackIcon, SkipForwardIcon, ChevronDownIcon, HeartIcon } from './IconComponents';
+import { PlayIcon, PauseIcon, SkipBackIcon, SkipForwardIcon, ChevronDownIcon, HeartIcon, YouTubeIcon } from './IconComponents';
 import TrackCover from './TrackCover';
-
-// Make FastAverageColor available on the window object
-declare global {
-    interface Window {
-        FastAverageColor: any;
-    }
-}
 
 interface PlayerProps {
   track: Track;
@@ -35,53 +28,14 @@ const formatTime = (seconds: number) => {
 };
 
 const Player: React.FC<PlayerProps> = ({ track, isPlaying, progress, onPlayPause, onNext, onPrev, onSeek, onSelectArtist, onMinimize, isLiked, onToggleLike }) => {
-  const [gradientStyle, setGradientStyle] = useState<React.CSSProperties>({ background: '#121212' });
-  const imageRef = useRef<HTMLImageElement>(null);
+  const [bgOpacity, setBgOpacity] = useState(0.5);
   const progressPercentage = (progress.duration > 0) ? (progress.currentTime / progress.duration) * 100 : 0;
 
   useEffect(() => {
-    const imageElement = imageRef.current;
-    
-    // Reset to default when track changes, before new color is calculated
-    setGradientStyle({ background: '#121212', transition: 'background 0.5s ease-out' });
-
-    if (!imageElement || typeof window.FastAverageColor === 'undefined') {
-      return;
-    }
-
-    const fac = new window.FastAverageColor();
-    
-    const extractColor = () => {
-      fac.getColorAsync(imageElement)
-        .then((color: any) => {
-          if (color.error) {
-            console.error("FastAverageColor Error:", color.error);
-            return; // Stick with the default background
-          }
-          const rgbaColor = `rgba(${color.value[0]}, ${color.value[1]}, ${color.value[2]}, 0.5)`;
-          setGradientStyle({
-            background: `radial-gradient(circle at top, ${rgbaColor} 0%, #121212 70%)`,
-            backgroundSize: '150% 150%',
-            animation: 'flow-gradient 20s ease infinite',
-          });
-        })
-        .catch((e: any) => {
-          console.error("Error getting color from track cover:", e);
-        });
-    };
-
-    if (imageElement.complete) {
-      extractColor();
-    } else {
-      imageElement.addEventListener('load', extractColor);
-    }
-    
-    return () => {
-      if (imageElement) {
-        imageElement.removeEventListener('load', extractColor);
-      }
-      fac.destroy();
-    };
+    // Fade effect for background on track change
+    setBgOpacity(0);
+    const timer = setTimeout(() => setBgOpacity(0.5), 500);
+    return () => clearTimeout(timer);
   }, [track.id]);
 
   const handleSeek = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -96,9 +50,19 @@ const Player: React.FC<PlayerProps> = ({ track, isPlaying, progress, onPlayPause
 
   return (
     <div
-      className="relative w-full h-full overflow-hidden transition-colors duration-1000"
-      style={gradientStyle}
+      className="relative w-full h-full overflow-hidden bg-background"
     >
+       <div 
+        key={track.id}
+        className="absolute inset-[-40px] bg-cover bg-center transition-opacity duration-1000 ease-in-out"
+        style={{
+          backgroundImage: `url(${track.coverUrl})`,
+          filter: 'blur(32px)',
+          opacity: bgOpacity,
+        }}
+      />
+      <div className="absolute inset-0 bg-black/50" />
+
       <div className="relative w-full h-full flex flex-col items-center text-text p-4 sm:p-8">
         
         <header className="w-full max-w-md flex justify-between items-center">
@@ -113,8 +77,6 @@ const Player: React.FC<PlayerProps> = ({ track, isPlaying, progress, onPlayPause
         <main key={track.id} className="flex-grow w-full flex flex-col items-center justify-center text-center pt-4 animate-fadeInScaleUp">
           <div className="relative w-64 h-64 sm:w-72 sm:h-72 md:w-80 md:h-80 rounded-2xl bg-surface shadow-2xl shadow-black/30 mb-8 overflow-hidden">
             <TrackCover
-              ref={imageRef}
-              crossOrigin="anonymous"
               src={track.coverUrl} 
               alt={track.title} 
               className="absolute inset-0 w-full h-full"
@@ -126,6 +88,18 @@ const Player: React.FC<PlayerProps> = ({ track, isPlaying, progress, onPlayPause
           <button onClick={handleArtistClick} className="text-lg sm:text-xl font-medium text-text-secondary hover:text-primary transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50 rounded-md">
             {track.artist}
           </button>
+
+          {track.youtubeClipUrl && (
+            <a
+              href={track.youtubeClipUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-6 bg-surface/50 backdrop-blur-sm text-text-secondary hover:text-primary hover:bg-surface transition-all duration-300 rounded-full px-4 py-2 text-sm font-semibold flex items-center justify-center gap-2 max-w-xs mx-auto"
+            >
+              <YouTubeIcon className="w-5 h-5" />
+              <span>Смотреть клип</span>
+            </a>
+          )}
         </main>
 
         <footer className="w-full max-w-md pb-4">

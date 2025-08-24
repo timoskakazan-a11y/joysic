@@ -15,12 +15,12 @@ interface ArtistPageProps {
   currentTrackId?: string | null;
   isPlaying: boolean;
   likedArtistIds: string[];
-  onToggleLikeArtist: (artistId: string) => void;
   likedTrackIds: string[];
-  onToggleLikeTrack: (trackId: string) => void;
+  favoriteCollectionIds: string[];
+  onToggleLike: (type: 'track' | 'artist' | 'album', id: string) => void;
 }
 
-const ArtistPage: React.FC<ArtistPageProps> = ({ artist, onBack, onPlayTrack, onSelectPlaylist, currentTrackId, isPlaying, likedArtistIds, onToggleLikeArtist, likedTrackIds, onToggleLikeTrack }) => {
+const ArtistPage: React.FC<ArtistPageProps> = ({ artist, onBack, onPlayTrack, onSelectPlaylist, currentTrackId, isPlaying, likedArtistIds, likedTrackIds, favoriteCollectionIds, onToggleLike }) => {
   const [isImageLoaded, setIsImageLoaded] = useState(false);
   const isLiked = likedArtistIds.includes(artist.id);
 
@@ -78,7 +78,7 @@ const ArtistPage: React.FC<ArtistPageProps> = ({ artist, onBack, onPlayTrack, on
                     <p className="text-text-secondary whitespace-pre-wrap leading-relaxed max-w-prose mb-4">{artist.description}</p>
                 )}
                 <button 
-                    onClick={() => onToggleLikeArtist(artist.id)}
+                    onClick={() => onToggleLike('artist', artist.id)}
                     className={`px-6 py-2 rounded-full font-bold text-sm transition-colors duration-300 ${isLiked ? 'bg-accent text-background' : 'bg-surface-light text-text hover:bg-surface'}`}
                 >
                     {isLiked ? 'Вы влюблены' : 'Влюбиться в исполнителя'}
@@ -96,17 +96,29 @@ const ArtistPage: React.FC<ArtistPageProps> = ({ artist, onBack, onPlayTrack, on
             <div className="mt-12">
                 <h2 className="text-2xl font-bold text-primary mb-4">Альбомы</h2>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
-                    {artist.albums.map(album => (
-                        <div key={album.id} onClick={() => onSelectPlaylist(album)} className="group cursor-pointer">
-                            <div className="relative aspect-square w-full rounded-2xl shadow-lg overflow-hidden bg-surface">
+                    {artist.albums.map(album => {
+                        const isAlbumLiked = favoriteCollectionIds.includes(album.id);
+                        return (
+                        <div key={album.id} className="group">
+                            <div className="relative aspect-square w-full rounded-2xl shadow-lg overflow-hidden bg-surface cursor-pointer" onClick={() => onSelectPlaylist(album)}>
                                 <TrackCover src={album.coverUrl} alt={album.name} className="w-full h-full transition-transform duration-500 group-hover:scale-110" />
+                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                             </div>
-                            <div className="mt-3">
-                                <h3 className="font-bold text-primary truncate">{album.name}</h3>
-                                <p className="text-sm text-text-secondary">{album.tracks.length} треков</p>
+                            <div className="mt-3 flex justify-between items-start">
+                                <div className="overflow-hidden mr-2" onClick={() => onSelectPlaylist(album)}>
+                                    <h3 className="font-bold text-primary truncate cursor-pointer">{album.name}</h3>
+                                    <p className="text-sm text-text-secondary">{album.tracks.length} треков</p>
+                                </div>
+                                <button
+                                  onClick={() => onToggleLike('album', album.id)}
+                                  className={`${isAlbumLiked ? 'text-accent' : 'text-text-secondary'} hover:text-primary transition-colors p-1 -mr-1 flex-shrink-0`}
+                                  aria-label={isAlbumLiked ? 'Убрать лайк с альбома' : 'Поставить лайк на альбом'}
+                                >
+                                    <HeartIcon filled={isAlbumLiked} className="w-5 h-5" />
+                                </button>
                             </div>
                         </div>
-                    ))}
+                    )})}
                 </div>
             </div>
         )}
@@ -145,7 +157,7 @@ const ArtistPage: React.FC<ArtistPageProps> = ({ artist, onBack, onPlayTrack, on
                 </div>
                 <div className="flex items-center gap-4 text-text-secondary text-sm">
                     <button 
-                      onClick={(e) => { e.stopPropagation(); onToggleLikeTrack(track.id); }} 
+                      onClick={(e) => { e.stopPropagation(); onToggleLike('track', track.id); }} 
                       className={`${isTrackLiked ? 'text-accent' : 'text-text-secondary'} hover:text-primary transition-colors`}
                       aria-label={isTrackLiked ? 'Убрать лайк' : 'Поставить лайк'}
                     >
