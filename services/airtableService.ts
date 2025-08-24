@@ -420,3 +420,16 @@ export const fetchPlaylistsForUser = async (user: User): Promise<{ playlists: Pl
 
     return { playlists: finalPlaylists, likedAlbums, favoritesPlaylistId: favoritesPlaylist ? favoritesPlaylist.id : null };
 };
+
+export const fetchBetaImage = async (): Promise<string | null> => {
+    const formula = `{Название} = 'Бета'`;
+    try {
+        const response = await fetchFromAirtable(PHOTOS_TABLE_NAME, {}, `?filterByFormula=${encodeURIComponent(formula)}`);
+        if (response.records && response.records.length > 0 && response.records[0].fields['Фото']?.[0]?.url) {
+            return response.records[0].fields['Фото'][0].url;
+        }
+    } catch (error) {
+        console.error('Error fetching beta image from Airtable:', error);
+    }
+    return null;
+};

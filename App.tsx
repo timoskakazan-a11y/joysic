@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { fetchTracks, fetchArtistDetails, loginUser, registerUser, updateUserLikes, fetchPlaylistsForUser, incrementTrackStats } from './services/airtableService';
+import { fetchTracks, fetchArtistDetails, loginUser, registerUser, updateUserLikes, fetchPlaylistsForUser, incrementTrackStats, fetchBetaImage } from './services/airtableService';
 import type { Track, Artist, User, Playlist } from './types';
 import Player from './components/Player';
 import ArtistPage from './components/ArtistPage';
@@ -8,8 +8,13 @@ import SplashScreen from './components/SplashScreen';
 import AuthPage from './components/AuthPage';
 import LibraryPage from './components/LibraryPage';
 import PlaylistDetailPage from './components/PlaylistDetailPage';
+import BetaLockScreen from './components/BetaLockScreen';
 
 const App: React.FC = () => {
+  const [isBetaLocked, setIsBetaLocked] = useState(false);
+  const [betaImageUrl, setBetaImageUrl] = useState<string | null>(null);
+  const [isCheckingBeta, setIsCheckingBeta] = useState(true);
+
   const [user, setUser] = useState<User | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
   
@@ -34,12 +39,32 @@ const App: React.FC = () => {
   const currentTrack = currentTrackIndex !== null && shuffledTracks.length > 0 ? shuffledTracks[currentTrackIndex] : null;
 
   useEffect(() => {
+    const checkBetaStatus = async () => {
+      if (window.location.hostname === 'joysic.netlify.app') {
+        setIsBetaLocked(true);
+        try {
+          const url = await fetchBetaImage();
+          setBetaImageUrl(url || 'https://i.postimg.cc/T3N3W0h1/beta-lock.png');
+        } catch (error) {
+          console.error("Failed to fetch beta image, using fallback.", error);
+          setBetaImageUrl('https://i.postimg.cc/T3N3W0h1/beta-lock.png');
+        }
+      } else {
+        setIsBetaLocked(false);
+      }
+      setIsCheckingBeta(false);
+    };
+    checkBetaStatus();
+  }, []);
+
+  useEffect(() => {
+    if (isCheckingBeta || isBetaLocked) return;
     const savedUser = localStorage.getItem('joysicUser');
     if (savedUser) {
       setUser(JSON.parse(savedUser));
     }
     setIsAuthLoading(false);
-  }, []);
+  }, [isCheckingBeta, isBetaLocked]);
 
   const loadAppData = useCallback(async (currentUser: User) => {
     try {
@@ -348,6 +373,8 @@ const App: React.FC = () => {
   const handleExpandPlayer = () => setIsPlayerExpanded(true);
   const handleMinimizePlayer = () => setIsPlayerExpanded(false);
 
+  if (isCheckingBeta) return <SplashScreen />;
+  if (isBetaLocked) return <BetaLockScreen imageUrl={betaImageUrl} />;
   if (isAuthLoading) return <SplashScreen />;
   if (!user) return <AuthPage onLogin={handleLogin} onRegister={handleRegister} />;
   if (isLoading) return <SplashScreen />;
