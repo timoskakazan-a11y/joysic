@@ -35,6 +35,7 @@ export interface Playlist {
   trackIds: string[];
   tracks: Track[];
   isFavorites: boolean;
+  type: 'встроенный' | 'пользовательский';
 }
 
 export interface AirtableTrackRecord {
@@ -96,5 +97,6 @@ export interface AirtablePlaylistRecord {
     'Обложка'?: { url: string }[];
     'Песни'?: string[];
     'пользователи'?: string[];
+    'Тип'?: 'встроенный' | 'пользовательский';
   }
 }

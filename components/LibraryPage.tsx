@@ -1,7 +1,6 @@
-
 import React from 'react';
 import type { User, Playlist } from '../types';
-import { HeartIcon, ShuffleIcon } from './IconComponents';
+import { ShuffleIcon, PlayIcon } from './IconComponents';
 
 interface LibraryPageProps {
   user: User;
@@ -15,11 +14,6 @@ const PlaylistCard: React.FC<{ playlist: Playlist; onSelect: () => void }> = ({ 
   <div onClick={onSelect} className="group cursor-pointer">
     <div className="relative aspect-square w-full rounded-2xl shadow-lg overflow-hidden bg-surface">
       <img src={playlist.coverUrl} alt={playlist.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
-      {playlist.isFavorites && (
-          <div className="absolute top-3 right-3 bg-background/50 backdrop-blur-sm rounded-full p-2">
-            <HeartIcon filled className="w-5 h-5 text-accent"/>
-          </div>
-      )}
     </div>
     <div className="mt-3">
       <h3 className="font-bold text-primary truncate">{playlist.name}</h3>
@@ -41,7 +35,12 @@ const LibraryPage: React.FC<LibraryPageProps> = ({ user, playlists, onSelectPlay
         </button>
       </header>
 
-      {playlists.length > 0 ? (
+      {playlists.length === 0 ? (
+        <div className="text-center py-20">
+          <p className="text-text-secondary">Плейлисты не найдены.</p>
+          <p className="text-text-secondary text-sm">Убедитесь, что они созданы в вашей базе Airtable.</p>
+        </div>
+      ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
           <div 
             onClick={onShufflePlayAll} 
@@ -56,11 +55,6 @@ const LibraryPage: React.FC<LibraryPageProps> = ({ user, playlists, onSelectPlay
           {playlists.map(playlist => (
             <PlaylistCard key={playlist.id} playlist={playlist} onSelect={() => onSelectPlaylist(playlist)} />
           ))}
-        </div>
-      ) : (
-        <div className="text-center py-20">
-          <p className="text-text-secondary">Плейлисты не найдены.</p>
-          <p className="text-text-secondary text-sm">Убедитесь, что они созданы в вашей базе Airtable.</p>
         </div>
       )}
     </div>

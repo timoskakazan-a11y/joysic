@@ -1,7 +1,7 @@
 
 import React from 'react';
 import type { Playlist } from '../types';
-import { PlayIcon, ChevronLeftIcon, SoundWaveIcon } from './IconComponents';
+import { PlayIcon, PauseIcon, ChevronLeftIcon, SoundWaveIcon } from './IconComponents';
 
 interface PlaylistDetailPageProps {
   playlist: Playlist;
@@ -9,15 +9,28 @@ interface PlaylistDetailPageProps {
   onPlayTrack: (trackId: string) => void;
   currentTrackId?: string | null;
   isPlaying: boolean;
+  onPlayPause: () => void;
 }
 
-const PlaylistDetailPage: React.FC<PlaylistDetailPageProps> = ({ playlist, onBack, onPlayTrack, currentTrackId, isPlaying }) => {
+const PlaylistDetailPage: React.FC<PlaylistDetailPageProps> = ({ playlist, onBack, onPlayTrack, currentTrackId, isPlaying, onPlayPause }) => {
   
-  const handlePlayAll = () => {
-    if (playlist.tracks.length > 0) {
-      onPlayTrack(playlist.tracks[0].id);
+  const isPlaylistActive = playlist.trackIds.includes(currentTrackId || '');
+  const isCurrentlyPlaying = isPlaylistActive && isPlaying;
+
+  const handlePlayPauseClick = () => {
+    // If a track from this playlist is already active (playing or paused), toggle play/pause
+    if (isPlaylistActive) {
+      onPlayPause();
+    } else {
+      // Otherwise, start playing the first track of the playlist
+      if (playlist.tracks.length > 0) {
+        onPlayTrack(playlist.tracks[0].id);
+      }
     }
-  }
+  };
+
+  const ButtonIcon = isCurrentlyPlaying ? PauseIcon : PlayIcon;
+  const buttonText = isCurrentlyPlaying ? 'Пауза' : 'Слушать';
 
   return (
     <div className="min-h-screen bg-background text-text font-sans">
@@ -33,7 +46,7 @@ const PlaylistDetailPage: React.FC<PlaylistDetailPageProps> = ({ playlist, onBac
         >
             <ChevronLeftIcon className="w-6 h-6" />
         </button>
-        <header className="flex flex-col md:flex-row items-center gap-6 md:gap-10 mb-8 mt-16 md:mt-24">
+        <header className="flex flex-col md:flex-row items-center md:items-start gap-6 md:gap-10 mb-8 mt-16 md:mt-24">
             <div className="relative w-40 h-40 md:w-48 md:h-48 rounded-2xl bg-surface shadow-lg overflow-hidden flex-shrink-0 border-4 border-background">
                 <img 
                     src={playlist.coverUrl} 
@@ -41,21 +54,29 @@ const PlaylistDetailPage: React.FC<PlaylistDetailPageProps> = ({ playlist, onBac
                     className="absolute inset-0 w-full h-full object-cover"
                 />
             </div>
-            <div className="text-center md:text-left">
-                <h1 className="text-4xl sm:text-6xl font-black tracking-tight text-primary mb-2">
-                    {playlist.name}
-                </h1>
-                {playlist.description && (
-                    <p className="text-text-secondary whitespace-pre-wrap leading-relaxed max-w-prose mb-4">{playlist.description}</p>
-                )}
-                 <button 
-                    onClick={handlePlayAll}
-                    disabled={playlist.tracks.length === 0}
-                    className="bg-accent text-background font-bold px-8 py-3 rounded-full hover:bg-opacity-80 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                >
-                    <PlayIcon className="w-5 h-5"/>
-                    <span>Слушать</span>
-                </button>
+            <div className="text-center md:text-left flex flex-col md:h-48">
+                <div className="flex-grow overflow-hidden">
+                    <h1 className="text-4xl sm:text-6xl font-black tracking-tight text-primary mb-2">
+                        {playlist.name}
+                    </h1>
+                    {playlist.description && (
+                        <p className="text-text-secondary whitespace-pre-wrap leading-relaxed max-w-prose">{playlist.description}</p>
+                    )}
+                </div>
+                <div className="flex-shrink-0 mt-4">
+                     <button 
+                        onClick={handlePlayPauseClick}
+                        disabled={playlist.tracks.length === 0}
+                        className={`font-bold px-8 py-3 rounded-full transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 mx-auto md:mx-0 ${
+                            isCurrentlyPlaying
+                              ? 'bg-white text-background hover:bg-white/90 transform scale-105'
+                              : 'bg-accent text-background hover:bg-opacity-80'
+                          }`}
+                    >
+                        <ButtonIcon className="w-5 h-5"/>
+                        <span>{buttonText}</span>
+                    </button>
+                </div>
             </div>
         </header>
 

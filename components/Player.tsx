@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import type { Track } from '../types';
 import { PlayIcon, PauseIcon, SkipBackIcon, SkipForwardIcon, ChevronDownIcon, HeartIcon } from './IconComponents';
 
@@ -27,17 +27,8 @@ const formatTime = (seconds: number) => {
   return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
 };
 
-const AnimatedPlaceholder: React.FC<{ className?: string }> = ({ className }) => (
-    <div className={`w-full h-full bg-surface-light animate-pulse ${className}`} />
-);
-
 const Player: React.FC<PlayerProps> = ({ track, isPlaying, progress, onPlayPause, onNext, onPrev, onSeek, onSelectArtist, onMinimize, isLiked, onToggleLike }) => {
-  const [isCoverLoaded, setIsCoverLoaded] = useState(false);
   const progressPercentage = (progress.duration > 0) ? (progress.currentTime / progress.duration) * 100 : 0;
-
-  useEffect(() => {
-    setIsCoverLoaded(false);
-  }, [track.coverUrl]);
 
   const handleSeek = (event: React.ChangeEvent<HTMLInputElement>) => {
     onSeek(Number(event.target.value));
@@ -62,15 +53,12 @@ const Player: React.FC<PlayerProps> = ({ track, isPlaying, progress, onPlayPause
             </button>
         </header>
 
-        <main className="flex-grow w-full flex flex-col items-center justify-center text-center pt-4">
+        <main key={track.id} className="flex-grow w-full flex flex-col items-center justify-center text-center pt-4 animate-fadeInScaleUp">
           <div className="relative w-64 h-64 sm:w-72 sm:h-72 md:w-80 md:h-80 rounded-2xl bg-surface shadow-2xl shadow-black/30 mb-8 overflow-hidden">
-            {!isCoverLoaded && <AnimatedPlaceholder />}
             <img 
               src={track.coverUrl} 
               alt={track.title} 
-              className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ease-in-out ${isCoverLoaded ? 'opacity-100' : 'opacity-0'}`}
-              onLoad={() => setIsCoverLoaded(true)}
-              onError={() => setIsCoverLoaded(true)} // Handle image load errors
+              className="absolute inset-0 w-full h-full object-cover"
             />
           </div>
           <h1 className="text-3xl sm:text-4xl font-black tracking-tight mb-2 text-primary">

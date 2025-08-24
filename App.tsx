@@ -315,6 +315,7 @@ const App: React.FC = () => {
                     onPlayTrack={(trackId) => handlePlayTrack(trackId, selectedPlaylist.tracks)}
                     currentTrackId={currentTrack?.id}
                     isPlaying={isPlaying}
+                    onPlayPause={handlePlayPause}
                 />
             );
         case 'library':

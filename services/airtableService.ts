@@ -90,7 +90,8 @@ export const registerUser = async (email: string, password: string, name: string
                     'Название': 'Любимое',
                     'Описание': 'Ваши любимые треки',
                     'Обложка': [{ url: coverUrl }],
-                    'пользователи': [newUserId]
+                    'пользователи': [newUserId],
+                    'Тип': 'встроенный'
                 }
             }]
         })
@@ -101,6 +102,33 @@ export const registerUser = async (email: string, password: string, name: string
         throw new Error('Не удалось создать плейлист "Любимое".');
     }
     const newPlaylistId = playlistCreateResponse.records[0].id;
+
+    // Link user to the shared "Новые артисты" playlist
+    try {
+        const newArtistsPlaylistFormula = `{Название} = 'Новые артисты'`;
+        const newArtistsPlaylistResponse = await fetchFromAirtable(PLAYLISTS_TABLE_NAME, {}, `?filterByFormula=${encodeURIComponent(newArtistsPlaylistFormula)}`);
+
+        if (newArtistsPlaylistResponse.records.length > 0) {
+            const playlistRecord = newArtistsPlaylistResponse.records[0];
+            const playlistId = playlistRecord.id;
+            const existingUsers = playlistRecord.fields['пользователи'] || [];
+            
+            const updatedUsers = [...new Set([...existingUsers, newUserId])];
+            
+            await fetchFromAirtable(PLAYLISTS_TABLE_NAME, {
+                method: 'PATCH',
+                body: JSON.stringify({
+                    records: [{
+                        id: playlistId,
+                        fields: { 'пользователи': updatedUsers }
+                    }]
+                })
+            });
+        }
+    } catch (e) {
+        console.error('Failed to link new user to "Новые артисты" playlist:', e);
+        // Do not block registration for this optional step
+    }
 
     // 4. Update user with the ID of the new "Любимое" playlist
     await fetchFromAirtable(USERS_TABLE_NAME, {
@@ -227,17 +255,57 @@ const mapAirtableRecordToPlaylist = (record: AirtablePlaylistRecord): Playlist |
         trackIds: fields['Песни'] || [],
         tracks: [], // to be populated later
         isFavorites: false, // will be set later
+        type: fields['Тип'] || 'пользовательский',
     };
 };
 
 export const fetchPlaylistsForUser = async (userId: string): Promise<Playlist[]> => {
-    // The Airtable formula `FIND(recordId, ARRAYJOIN({linked_records}))` is unreliable
-    // because ARRAYJOIN operates on the primary field (display value) of linked records, not their IDs.
-    // A more reliable method, without changing the base schema, is to fetch all playlists and filter on the client-side.
-    // This is less performant for large datasets but acceptable for this application's scale.
     const response = await fetchFromAirtable(PLAYLISTS_TABLE_NAME, {});
-    return response.records
-        .filter((record: AirtablePlaylistRecord) => record.fields['пользователи']?.includes(userId))
+    const allPlaylistRecords: AirtablePlaylistRecord[] = response.records;
+
+    const playlistsMap = new Map<string, AirtablePlaylistRecord>();
+
+    // 1. Add all playlists the user is directly linked to
+    allPlaylistRecords
+        .filter(record => record.fields['пользователи']?.includes(userId))
+        .forEach(record => playlistsMap.set(record.id, record));
+
+    // 2. Find and add the shared "Новые артисты" playlist.
+    // Also, link the user to it in Airtable if they aren't already.
+    const newArtistsPlaylist = allPlaylistRecords.find(record => record.fields['Название'] === 'Новые артисты');
+    if (newArtistsPlaylist) {
+        const isUserAlreadyLinked = newArtistsPlaylist.fields['пользователи']?.includes(userId);
+
+        // If the user isn't linked in Airtable, add them now.
+        // This handles existing users who were registered before this playlist was created.
+        if (!isUserAlreadyLinked) {
+            try {
+                const playlistId = newArtistsPlaylist.id;
+                const existingUsers = newArtistsPlaylist.fields['пользователи'] || [];
+                const updatedUsers = [...new Set([...existingUsers, userId])];
+                
+                // Asynchronously update the record in the background.
+                // We don't await this so it doesn't slow down the initial load.
+                fetchFromAirtable(PLAYLISTS_TABLE_NAME, {
+                    method: 'PATCH',
+                    body: JSON.stringify({
+                        records: [{
+                            id: playlistId,
+                            fields: { 'пользователи': updatedUsers }
+                        }]
+                    })
+                }).catch(e => console.error('Background update of "Новые артисты" playlist failed:', e));
+
+            } catch (e) {
+                console.error('Failed to prepare update for "Новые артисты" playlist:', e);
+            }
+        }
+        
+        // Always add the playlist to the user's list for immediate UI visibility.
+        playlistsMap.set(newArtistsPlaylist.id, newArtistsPlaylist);
+    }
+    
+    return Array.from(playlistsMap.values())
         .map(mapAirtableRecordToPlaylist)
         .filter((p): p is Playlist => p !== null);
 };
