@@ -6,19 +6,27 @@ interface BetaLockScreenProps {
 
 const BetaLockScreen: React.FC<BetaLockScreenProps> = ({ imageUrl }) => {
   return (
-    <div className="min-h-screen bg-background text-text flex flex-col justify-center items-center p-6 text-center">
-      <div className="w-full max-w-md">
-        {imageUrl ? (
-          <img src={imageUrl} alt="Бета-тест" className="w-64 h-64 mx-auto mb-8 animate-breathing" />
-        ) : (
-          <div className="w-64 h-64 mx-auto mb-8 bg-surface rounded-2xl animate-pulse"></div>
-        )}
-        <h1 className="text-4xl font-black text-primary mb-4">Скоро...</h1>
-        <p className="text-text-secondary leading-relaxed">
-          Скоро начнется закрытое бета-тестирование Joysic.
-          <br />
-          На данный момент доступ к приложению ограничен. Спасибо за ваш интерес!
-        </p>
+    <div className="min-h-screen bg-background text-text flex flex-col justify-center items-center p-6 text-center relative overflow-hidden">
+      {/* Background glow effect */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[60vw] h-[60vh] bg-accent/10 rounded-full blur-3xl opacity-50" aria-hidden="true"></div>
+      
+      <div className="relative w-full max-w-md bg-surface/70 backdrop-blur-xl p-8 sm:p-12 rounded-2xl shadow-2xl shadow-black/30 border border-surface-light animate-fadeInScaleUp">
+        <div className="flex flex-col items-center">
+          {imageUrl ? (
+            <img 
+              src={imageUrl} 
+              alt="Бета-тест" 
+              className="w-56 h-56 mx-auto mb-8 drop-shadow-[0_10px_15px_rgba(187,134,252,0.15)] animate-breathing"
+            />
+          ) : (
+            <div className="w-56 h-56 mx-auto mb-8 bg-surface-light rounded-2xl animate-pulse"></div>
+          )}
+          <h1 className="text-3xl sm:text-4xl font-black text-primary mb-4">Бета-тест скоро начнется</h1>
+          <p className="text-text-secondary leading-relaxed max-w-sm">
+            Доступ к приложению временно ограничен.
+            Спасибо за ваш интерес к Joysic!
+          </p>
+        </div>
       </div>
     </div>
   );
