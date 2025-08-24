@@ -286,7 +286,7 @@ export const fetchArtistDetails = async (artistId: string): Promise<Artist> => {
     const allPlaylistRecords: AirtablePlaylistRecord[] = allPlaylistsResponse.records || [];
 
     const artistAlbumRecords = allPlaylistRecords.filter(record => 
-        Array.isArray(record.fields['Исполнитель']) && record.fields['Исполнитель'].includes(artistId) &&
+        record && record.fields && Array.isArray(record.fields['Исполнитель']) && record.fields['Исполнитель'].includes(artistId) &&
         record.fields['Альбом/Плейлист'] === 'альбом'
     );
     
@@ -373,8 +373,10 @@ export const fetchPlaylistsForUser = async (user: User): Promise<{ playlists: Pl
     const likedAlbums: Playlist[] = [];
     let favoritesPlaylist: Playlist | null = null;
     
+    const favoriteIds = Array.isArray(user.favoriteCollectionIds) ? user.favoriteCollectionIds : [];
+    
     const userFavoriteCollections = allPlaylistRecords
-      .filter(record => user.favoriteCollectionIds.includes(record.id))
+      .filter(record => record && record.id && favoriteIds.includes(record.id))
       .map(mapAirtableRecordToPlaylist)
       .filter((p): p is Playlist => p !== null);
 
@@ -391,8 +393,8 @@ export const fetchPlaylistsForUser = async (user: User): Promise<{ playlists: Pl
     }
 
     // Find and add the shared "Новые артисты" playlist.
-    const newArtistsPlaylistRecord = allPlaylistRecords.find(record => record.fields['Название'] === 'Новые артисты');
-    if (newArtistsPlaylistRecord) {
+    const newArtistsPlaylistRecord = allPlaylistRecords.find(record => record && record.fields && record.fields['Название'] === 'Новые артисты');
+    if (newArtistsPlaylistRecord && newArtistsPlaylistRecord.fields) {
         const isUserAlreadyLinked = newArtistsPlaylistRecord.fields['пользователи']?.includes(user.id);
         if (!isUserAlreadyLinked) {
             try {
