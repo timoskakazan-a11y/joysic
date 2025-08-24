@@ -12,7 +12,13 @@ import PlaylistDetailPage from './components/PlaylistDetailPage';
 import BetaLockScreen from './components/BetaLockScreen';
 import ScannerModal from './components/ScannerModal';
 
-let BETA_LOCK_MODE: 'on' | 'off' = 'off'; // 'on' or 'off'
+interface AppConfig {
+  BETA_LOCK_MODE: 'on' | 'off';
+}
+
+const config: AppConfig = {
+  BETA_LOCK_MODE: 'off', // 'on' or 'off'
+};
 
 const App: React.FC = () => {
   const [isBetaLocked, setIsBetaLocked] = useState(false);
@@ -46,7 +52,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const checkBetaStatus = async () => {
-      if (BETA_LOCK_MODE === 'on' && window.location.hostname === 'joysic.netlify.app') {
+      if (config.BETA_LOCK_MODE === 'on' && window.location.hostname === 'joysic.netlify.app') {
         setIsBetaLocked(true);
         try {
           const url = await fetchBetaImage();

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 
-declare const JsBarcode: any;
+declare const QRCode: any;
 
 interface BarcodeProps {
   value: string;
@@ -12,21 +12,18 @@ const Barcode: React.FC<BarcodeProps> = ({ value, className, options }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
-    if (canvasRef.current && typeof JsBarcode !== 'undefined') {
-      try {
-        JsBarcode(canvasRef.current, value, {
-          format: 'CODE128',
-          lineColor: '#e5e7eb',
-          background: 'transparent',
-          width: 3,
-          height: 80,
-          displayValue: false,
-          margin: 10,
-          ...options,
-        });
-      } catch (e) {
-        console.error("JsBarcode error:", e);
-      }
+    if (canvasRef.current && typeof QRCode !== 'undefined') {
+      QRCode.toCanvas(canvasRef.current, value, {
+        width: 192,
+        color: {
+          dark: '#e5e7eb',
+          light: '#00000000'
+        },
+        errorCorrectionLevel: 'H',
+        ...options
+      }, function (error: any) {
+        if (error) console.error("QRCode generation error:", error);
+      });
     }
   }, [value, options]);
 

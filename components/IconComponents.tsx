@@ -106,6 +106,6 @@ export const SearchIcon: React.FC<IconProps> = ({ className = "w-6 h-6" }) => (
 
 export const QrCodeIcon: React.FC<IconProps> = ({ className = "w-6 h-6" }) => (
     <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="currentColor" viewBox="0 0 24 24">
-        <path d="M4 5h1v14H4V5zm3 0h2v14H7V5zm4 0h1v14h-1V5zm3 0h2v14h-2V5zm3 0h3v14h-3V5z"></path>
+        <path d="M3 11h8V3H3v8zm2-6h4v4H5V5zM3 21h8v-8H3v8zm2-6h4v4H5v-4zM13 3v8h8V3h-8zm6 6h-4V5h4v4zM13 13h2v2h-2v-2zm2 2h2v2h-2v-2zm-2 2h2v2h-2v-2zm4 0h2v2h-2v-2zm2 2h2v2h-2v-2zm-4 0h2v2h-2v-2z" />
     </svg>
 );

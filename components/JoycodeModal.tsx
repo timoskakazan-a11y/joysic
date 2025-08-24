@@ -25,25 +25,15 @@ const JoycodeModal: React.FC<JoycodeModalProps> = ({ track, onClose }) => {
         <h2 className="text-2xl font-bold text-primary truncate">{track.title}</h2>
         <p className="text-text-secondary mb-6">{track.artist}</p>
         
-        <div className="bg-surface-light p-4 rounded-xl flex justify-center items-center">
-            <svg width="0" height="0" className="absolute">
-                <defs>
-                    <clipPath id="heart-clip-path" clipPathUnits="objectBoundingBox">
-                        <path d="M0.5,1 C0.5,1,0,0.7,0,0.3 A0.25,0.25,0,0,1,0.5,0.3 A0.25,0.25,0,0,1,1,0.3 C1,0.7,0.5,1,0.5,1 Z" />
-                    </clipPath>
-                </defs>
-            </svg>
-            <div style={{ clipPath: 'url(#heart-clip-path)' }} className="w-64 h-56 flex justify-center items-center -my-3">
-                <Barcode 
-                    value={track.id} 
-                    className="w-full"
-                    options={{
-                        width: 2.5,
-                        height: 120,
-                        margin: 0,
-                    }}
-                />
-            </div>
+        <div className="bg-surface-light p-2 rounded-2xl">
+          <div className="bg-background rounded-xl overflow-hidden flex justify-center items-center p-4">
+            <Barcode 
+                value={track.id} 
+                options={{
+                    width: 200,
+                }}
+            />
+          </div>
         </div>
 
         <p className="text-xs text-text-secondary mt-4">Отсканируйте этот Joycode в приложении, чтобы поделиться треком.</p>
