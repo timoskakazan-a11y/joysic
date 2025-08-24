@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { CloseIcon } from './IconComponents';
 
 declare const Html5Qrcode: any;
 declare const Html5QrcodeSupportedFormats: any;
@@ -23,8 +24,8 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ onClose, onScanSuccess }) =
                 qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
                     const edge = Math.min(viewfinderWidth, viewfinderHeight);
                     return {
-                        width: edge * 0.8,
-                        height: edge * 0.8
+                        width: edge * 0.7,
+                        height: edge * 0.7
                     };
                 },
                 formatsToSupport: [ Html5QrcodeSupportedFormats.QR_CODE ]
@@ -52,22 +53,6 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ onClose, onScanSuccess }) =
                 } catch (err: any) {
                     console.error("Camera Error:", err);
                     setError("Не удалось получить доступ к камере. Проверьте разрешения в настройках браузера.");
-                    // Fallback for devices without back camera
-                    if (err.name === "NotAllowedError" || err.name === "NotFoundError") {
-                       // Do nothing specific, error message is shown
-                    } else {
-                        // try front camera if back fails
-                         try {
-                            await html5QrCode.start(
-                                { facingMode: "user" },
-                                config,
-                                successCallback,
-                                errorCallback
-                            );
-                        } catch (frontErr) {
-                             console.error("Front Camera Error:", frontErr);
-                        }
-                    }
                 }
             };
 
@@ -82,19 +67,47 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ onClose, onScanSuccess }) =
     }, [onScanSuccess]);
 
     return (
-        <div className="fixed inset-0 bg-black/80 z-[100] flex flex-col items-center justify-center animate-fadeInScaleUp" onClick={onClose}>
-            <div className="relative bg-surface rounded-3xl w-full max-w-md aspect-square overflow-hidden shadow-2xl m-4" onClick={e => e.stopPropagation()}>
-                <div id="qr-reader" ref={scannerRef} className="w-full h-full"></div>
-                {error && <div className="absolute inset-0 bg-background flex items-center justify-center p-4 text-center text-red-400">{error}</div>}
-                 <div className="absolute inset-0 pointer-events-none border-[30px] border-black/30 rounded-3xl"></div>
-                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80%] aspect-square pointer-events-none rounded-2xl shadow-[0_0_0_4px_rgba(255,255,255,0.2)]">
-                    <div className="absolute top-0 left-0 w-10 h-10 border-t-4 border-l-4 border-white rounded-tl-xl"></div>
-                    <div className="absolute top-0 right-0 w-10 h-10 border-t-4 border-r-4 border-white rounded-tr-xl"></div>
-                    <div className="absolute bottom-0 left-0 w-10 h-10 border-b-4 border-l-4 border-white rounded-bl-xl"></div>
-                    <div className="absolute bottom-0 right-0 w-10 h-10 border-b-4 border-r-4 border-white rounded-br-xl"></div>
+        <div 
+            className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex flex-col items-center justify-center p-4 animate-fadeInScaleUp"
+            onClick={onClose}
+        >
+            <div 
+                className="relative bg-black rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl border border-surface-light flex flex-col"
+                onClick={e => e.stopPropagation()}
+            >
+                <header className="absolute top-0 left-0 right-0 h-16 bg-gradient-to-b from-black/50 to-transparent flex justify-between items-center p-4 z-20">
+                    <h2 className="text-lg font-bold text-primary">Сканировать Joycode</h2>
+                    <button onClick={onClose} className="text-text-secondary hover:text-primary transition-colors p-1">
+                        <CloseIcon className="w-6 h-6" />
+                    </button>
+                </header>
+                
+                <div className="relative w-full aspect-square">
+                    <div id="qr-reader" ref={scannerRef} className="absolute inset-0 [&>video]:w-full [&>video]:h-full [&>video]:object-cover"></div>
+                    {error && <div className="absolute inset-0 bg-background flex items-center justify-center p-4 text-center text-red-400">{error}</div>}
+                    
+                    {/* Viewfinder overlay */}
+                    <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                        <div className="w-[70%] h-[70%] relative overflow-hidden">
+                            {/* Cutout effect */}
+                            <div className="absolute -top-1/2 -bottom-1/2 -left-1/2 -right-1/2 shadow-[0_0_0_2000px_rgba(0,0,0,0.5)]"></div>
+
+                            {/* Corner borders */}
+                            <div className="absolute top-0 left-0 w-10 h-10 border-t-[5px] border-l-[5px] border-white"></div>
+                            <div className="absolute top-0 right-0 w-10 h-10 border-t-[5px] border-r-[5px] border-white"></div>
+                            <div className="absolute bottom-0 left-0 w-10 h-10 border-b-[5px] border-l-[5px] border-white"></div>
+                            <div className="absolute bottom-0 right-0 w-10 h-10 border-b-[5px] border-r-[5px] border-white"></div>
+
+                            {/* Scanning laser */}
+                            <div className="absolute top-0 left-0 right-0 h-1.5 bg-accent shadow-[0_0_10px_2px_theme(colors.accent)] animate-scan"></div>
+                        </div>
+                    </div>
                 </div>
+
+                <footer className="h-16 flex items-center justify-center text-center p-4 bg-black">
+                    <p className="text-text-secondary">Наведите камеру на Joycode</p>
+                </footer>
             </div>
-            <p className="text-white mt-4">Наведите камеру на Joycode</p>
         </div>
     );
 };

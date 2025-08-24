@@ -44,11 +44,16 @@
                 '50%': { 'background-position': '100% 50%' },
                 '100%': { 'background-position': '0% 50%' },
               },
+              scan: {
+                '0%': { transform: 'translateY(0%)' },
+                '100%': { transform: 'translateY(calc(100% - 4px))' },
+              }
             },
             animation: {
               breathing: 'breathing 2.5s ease-in-out infinite',
               fadeInScaleUp: 'fadeInScaleUp 0.6s cubic-bezier(0.22, 1, 0.36, 1)',
               'flow-gradient': 'flow-gradient 20s ease infinite',
+              scan: 'scan 2.5s linear infinite alternate',
             }
           },
         },
