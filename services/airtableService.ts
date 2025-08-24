@@ -184,6 +184,19 @@ export const updateUserLikes = async (user: User, likedTrackIds: string[], liked
     await Promise.all(promises);
 };
 
+export const incrementTrackStats = async (trackId: string, field: 'Лайки' | 'Прослушивания', currentValue: number, increment: number = 1): Promise<void> => {
+    await fetchFromAirtable(MUSIC_TABLE_NAME, {
+        method: 'PATCH',
+        body: JSON.stringify({
+            records: [{
+                id: trackId,
+                fields: {
+                    [field]: currentValue + increment
+                }
+            }]
+        })
+    });
+};
 
 const mapAirtableRecordToTrack = (record: AirtableTrackRecord, artistMap: Map<string, string>): Track | null => {
     const fields = record.fields;
@@ -232,6 +245,8 @@ const mapAirtableRecordToTrack = (record: AirtableTrackRecord, artistMap: Map<st
         artwork,
         coverUrl,
         coverUrlType,
+        likes: fields['Лайки'] || 0,
+        listens: fields['Прослушивания'] || 0,
     };
 };
 

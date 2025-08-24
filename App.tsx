@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { fetchTracks, fetchArtistDetails, loginUser, registerUser, updateUserLikes, fetchPlaylistsForUser } from './services/airtableService';
+import { fetchTracks, fetchArtistDetails, loginUser, registerUser, updateUserLikes, fetchPlaylistsForUser, incrementTrackStats } from './services/airtableService';
 import type { Track, Artist, User, Playlist } from './types';
 import Player from './components/Player';
 import ArtistPage from './components/ArtistPage';
@@ -120,59 +120,64 @@ const App: React.FC = () => {
     if (!user) return;
 
     const originalUser = { ...user };
-    const originalPlaylists = JSON.parse(JSON.stringify(playlists)); // Deep copy for reliable revert
+    const originalPlaylists = JSON.parse(JSON.stringify(playlists));
+    const originalTracks = JSON.parse(JSON.stringify(tracks));
 
-    let updatedLikedIds: string[];
-    let userKey: 'likedTrackIds' | 'likedArtistIds';
-    
+    let updatedUser: User;
+
     if (type === 'track') {
-        userKey = 'likedTrackIds';
         const isLiked = user.likedTrackIds.includes(id);
-        updatedLikedIds = isLiked ? user.likedTrackIds.filter(likedId => likedId !== id) : [...user.likedTrackIds, id];
+        const updatedLikedIds = isLiked ? user.likedTrackIds.filter(likedId => likedId !== id) : [...user.likedTrackIds, id];
+        updatedUser = { ...user, likedTrackIds: updatedLikedIds };
 
-        // Optimistically update playlists state without reloading all data
         const trackToUpdate = tracks.find(t => t.id === id);
-        if (trackToUpdate && user.favoritesPlaylistId) {
+        if (trackToUpdate) {
+            const newLikeCount = (trackToUpdate.likes || 0) + (isLiked ? -1 : 1);
+            const updatedTrack = { ...trackToUpdate, likes: newLikeCount };
+            const newTracks = tracks.map(t => t.id === id ? updatedTrack : t);
+            setTracks(newTracks);
+
             setPlaylists(currentPlaylists =>
                 currentPlaylists.map(p => {
+                    let newPlaylistTracks = p.tracks.map(t => t.id === id ? updatedTrack : t);
                     if (p.id === user.favoritesPlaylistId) {
-                        let newTracks = p.tracks;
-                        let newTrackIds = p.trackIds;
-                        
                         if (isLiked) { // Unliking
-                            newTracks = p.tracks.filter(t => t.id !== id);
-                            newTrackIds = p.trackIds.filter(tid => tid !== id);
+                            newPlaylistTracks = newPlaylistTracks.filter(t => t.id !== id);
                         } else { // Liking
-                            // Only add if not already present
                             if (!p.trackIds.includes(id)) {
-                                newTracks = [...p.tracks, trackToUpdate];
-                                newTrackIds = [...p.trackIds, id];
+                                newPlaylistTracks = [...newPlaylistTracks, updatedTrack];
                             }
                         }
-                        return { ...p, tracks: newTracks, trackIds: newTrackIds };
                     }
-                    return p;
+                    return { ...p, tracks: newPlaylistTracks };
                 })
             );
         }
-    } else {
-        userKey = 'likedArtistIds';
+    } else { // artist
         const isLiked = user.likedArtistIds.includes(id);
-        updatedLikedIds = isLiked ? user.likedArtistIds.filter(likedId => likedId !== id) : [...user.likedArtistIds, id];
+        const updatedLikedIds = isLiked ? user.likedArtistIds.filter(likedId => likedId !== id) : [...user.likedArtistIds, id];
+        updatedUser = { ...user, likedArtistIds: updatedLikedIds };
     }
 
-    const updatedUser = { ...user, [userKey]: updatedLikedIds };
     setUser(updatedUser);
     localStorage.setItem('joysicUser', JSON.stringify(updatedUser));
 
     try {
-      // Sync with backend
-      await updateUserLikes(user, updatedUser.likedTrackIds, updatedUser.likedArtistIds);
+      const promises = [updateUserLikes(user, updatedUser.likedTrackIds, updatedUser.likedArtistIds)];
+      if (type === 'track') {
+          const trackToUpdate = originalTracks.find((t: Track) => t.id === id);
+          if (trackToUpdate) {
+            const isLiked = originalUser.likedTrackIds.includes(id);
+            promises.push(incrementTrackStats(id, 'Лайки', trackToUpdate.likes || 0, isLiked ? -1 : 1));
+          }
+      }
+      await Promise.all(promises);
+
     } catch (error) {
       console.error('Failed to update likes:', error);
-      // Revert state on failure
       setUser(originalUser);
       setPlaylists(originalPlaylists);
+      setTracks(originalTracks);
       localStorage.setItem('joysicUser', JSON.stringify(originalUser));
     }
   };
@@ -239,6 +244,11 @@ const App: React.FC = () => {
     setIsPlayerExpanded(false);
     try {
       const artistDetails = await fetchArtistDetails(artistId);
+      // Populate artist tracks with full track data from state for accurate stats
+      artistDetails.tracks = artistDetails.tracks.map(t => tracks.find(fullTrack => fullTrack.id === t.id) || t);
+      artistDetails.albums.forEach(album => {
+        album.tracks = album.tracks.map(t => tracks.find(fullTrack => fullTrack.id === t.id) || t);
+      });
       setSelectedArtist(artistDetails);
     } catch (err) {
       setError(`Failed to load artist details.`);
@@ -265,13 +275,37 @@ const App: React.FC = () => {
       } else {
         setCurrentTrackIndex(0);
         setIsPlaying(true);
+        
+        // Increment listen count
+        const trackToUpdate = tracks.find(t => t.id === trackId);
+        if (trackToUpdate) {
+            const updatedTrack = { ...trackToUpdate, listens: (trackToUpdate.listens || 0) + 1 };
+            const newTracks = tracks.map(t => t.id === trackId ? updatedTrack : t);
+            setTracks(newTracks);
+
+            setPlaylists(currentPlaylists =>
+                currentPlaylists.map(p => ({
+                    ...p,
+                    tracks: p.tracks.map(t => t.id === trackId ? updatedTrack : t)
+                }))
+            );
+
+            incrementTrackStats(trackId, 'Прослушивания', trackToUpdate.listens || 0).catch(err => {
+                console.error("Failed to update listen count:", err);
+            });
+        }
       }
     }
     setIsPlayerExpanded(false);
   };
   
   const handleSelectPlaylist = (playlist: Playlist) => {
-    setSelectedPlaylist(playlist);
+    // Ensure playlist tracks have the latest stats
+    const updatedPlaylist = {
+      ...playlist,
+      tracks: playlist.trackIds.map(tid => tracks.find(t => t.id === tid)).filter((t): t is Track => !!t)
+    };
+    setSelectedPlaylist(updatedPlaylist);
     setView('playlistDetail');
   }
 
@@ -306,6 +340,8 @@ const App: React.FC = () => {
                     likedArtistIds={user.likedArtistIds}
                     onToggleLikeArtist={(artistId) => handleToggleLike('artist', artistId)}
                     onSelectPlaylist={handleSelectPlaylist}
+                    likedTrackIds={user.likedTrackIds}
+                    onToggleLikeTrack={(trackId) => handleToggleLike('track', trackId)}
                 />
             );
         case 'playlistDetail':
@@ -317,6 +353,8 @@ const App: React.FC = () => {
                     currentTrackId={currentTrack?.id}
                     isPlaying={isPlaying}
                     onPlayPause={handlePlayPause}
+                    likedTrackIds={user.likedTrackIds}
+                    onToggleLikeTrack={(trackId) => handleToggleLike('track', trackId)}
                 />
             );
         case 'library':

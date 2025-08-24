@@ -14,6 +14,8 @@ export interface Track {
   artwork: Artwork[];
   coverUrl: string;
   coverUrlType: string;
+  likes: number;
+  listens: number;
 }
 
 export interface Artist {
@@ -72,6 +74,8 @@ export interface AirtableTrackRecord {
     'Слова'?: string;
     'Аудио'?: { url: string }[];
     'Обложка трека'?: AirtableAttachment[];
+    'Лайки'?: number;
+    'Прослушивания'?: number;
   };
 }
 

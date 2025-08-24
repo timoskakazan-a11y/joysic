@@ -1,7 +1,7 @@
-
-import React from 'react';
-import type { Playlist } from '../types';
-import { PlayIcon, PauseIcon, ChevronLeftIcon, SoundWaveIcon } from './IconComponents';
+import React, { useMemo } from 'react';
+import type { Playlist, Track } from '../types';
+import { PlayIcon, PauseIcon, ChevronLeftIcon, SoundWaveIcon, HeartIcon } from './IconComponents';
+import TrackCover from './TrackCover';
 
 interface PlaylistDetailPageProps {
   playlist: Playlist;
@@ -10,21 +10,25 @@ interface PlaylistDetailPageProps {
   currentTrackId?: string | null;
   isPlaying: boolean;
   onPlayPause: () => void;
+  likedTrackIds: string[];
+  onToggleLikeTrack: (trackId: string) => void;
 }
 
-const PlaylistDetailPage: React.FC<PlaylistDetailPageProps> = ({ playlist, onBack, onPlayTrack, currentTrackId, isPlaying, onPlayPause }) => {
+const PlaylistDetailPage: React.FC<PlaylistDetailPageProps> = ({ playlist, onBack, onPlayTrack, currentTrackId, isPlaying, onPlayPause, likedTrackIds, onToggleLikeTrack }) => {
   
   const isPlaylistActive = playlist.trackIds.includes(currentTrackId || '');
   const isCurrentlyPlaying = isPlaylistActive && isPlaying;
 
+  const sortedTracks = useMemo(() => 
+    [...playlist.tracks].sort((a, b) => (b.listens || 0) - (a.listens || 0)),
+  [playlist.tracks]);
+
   const handlePlayPauseClick = () => {
-    // If a track from this playlist is already active (playing or paused), toggle play/pause
     if (isPlaylistActive) {
       onPlayPause();
     } else {
-      // Otherwise, start playing the first track of the playlist
-      if (playlist.tracks.length > 0) {
-        onPlayTrack(playlist.tracks[0].id);
+      if (sortedTracks.length > 0) {
+        onPlayTrack(sortedTracks[0].id);
       }
     }
   };
@@ -48,10 +52,10 @@ const PlaylistDetailPage: React.FC<PlaylistDetailPageProps> = ({ playlist, onBac
         </button>
         <header className="flex flex-col md:flex-row items-center md:items-start gap-6 md:gap-10 mb-8 mt-16 md:mt-24">
             <div className="relative w-40 h-40 md:w-48 md:h-48 rounded-2xl bg-surface shadow-lg overflow-hidden flex-shrink-0 border-4 border-background">
-                <img 
+                <TrackCover 
                     src={playlist.coverUrl} 
                     alt={playlist.name} 
-                    className="absolute inset-0 w-full h-full object-cover"
+                    className="absolute inset-0 w-full h-full"
                 />
             </div>
             <div className="text-center md:text-left flex flex-col md:h-48">
@@ -83,8 +87,9 @@ const PlaylistDetailPage: React.FC<PlaylistDetailPageProps> = ({ playlist, onBac
         <div>
           <h2 className="text-2xl font-bold text-primary mb-4">Треки</h2>
           <div className="space-y-2">
-            {playlist.tracks.length > 0 ? playlist.tracks.map((track, index) => {
+            {sortedTracks.length > 0 ? sortedTracks.map((track, index) => {
               const isActive = track.id === currentTrackId;
+              const isTrackLiked = likedTrackIds.includes(track.id);
               return (
               <div
                 key={track.id}
@@ -106,11 +111,20 @@ const PlaylistDetailPage: React.FC<PlaylistDetailPageProps> = ({ playlist, onBac
                     )}
                 </div>
                 <div className="relative w-12 h-12 rounded-md bg-surface overflow-hidden flex-shrink-0">
-                  <img src={track.coverUrl} alt={track.title} className="w-full h-full object-cover" />
+                  <TrackCover src={track.coverUrl} alt={track.title} className="w-full h-full" />
                 </div>
                 <div className="flex-grow mx-4">
                   <p className={`font-semibold ${isActive ? 'text-accent' : 'text-text'}`}>{track.title}</p>
                   <p className="text-sm text-text-secondary">{track.artist}</p>
+                </div>
+                <div className="flex items-center gap-4 text-text-secondary text-sm">
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); onToggleLikeTrack(track.id); }} 
+                      className={`${isTrackLiked ? 'text-accent' : 'text-text-secondary'} hover:text-primary transition-colors`}
+                      aria-label={isTrackLiked ? 'Убрать лайк' : 'Поставить лайк'}
+                    >
+                        <HeartIcon filled={isTrackLiked} className="w-5 h-5" />
+                    </button>
                 </div>
               </div>
             )}) : (

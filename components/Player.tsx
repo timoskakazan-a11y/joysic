@@ -1,7 +1,14 @@
-
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { Track } from '../types';
 import { PlayIcon, PauseIcon, SkipBackIcon, SkipForwardIcon, ChevronDownIcon, HeartIcon } from './IconComponents';
+import TrackCover from './TrackCover';
+
+// Make FastAverageColor available on the window object
+declare global {
+    interface Window {
+        FastAverageColor: any;
+    }
+}
 
 interface PlayerProps {
   track: Track;
@@ -28,7 +35,54 @@ const formatTime = (seconds: number) => {
 };
 
 const Player: React.FC<PlayerProps> = ({ track, isPlaying, progress, onPlayPause, onNext, onPrev, onSeek, onSelectArtist, onMinimize, isLiked, onToggleLike }) => {
+  const [gradientStyle, setGradientStyle] = useState<React.CSSProperties>({ background: '#121212' });
+  const imageRef = useRef<HTMLImageElement>(null);
   const progressPercentage = (progress.duration > 0) ? (progress.currentTime / progress.duration) * 100 : 0;
+
+  useEffect(() => {
+    const imageElement = imageRef.current;
+    
+    // Reset to default when track changes, before new color is calculated
+    setGradientStyle({ background: '#121212', transition: 'background 0.5s ease-out' });
+
+    if (!imageElement || typeof window.FastAverageColor === 'undefined') {
+      return;
+    }
+
+    const fac = new window.FastAverageColor();
+    
+    const extractColor = () => {
+      fac.getColorAsync(imageElement)
+        .then((color: any) => {
+          if (color.error) {
+            console.error("FastAverageColor Error:", color.error);
+            return; // Stick with the default background
+          }
+          const rgbaColor = `rgba(${color.value[0]}, ${color.value[1]}, ${color.value[2]}, 0.5)`;
+          setGradientStyle({
+            background: `radial-gradient(circle at top, ${rgbaColor} 0%, #121212 70%)`,
+            backgroundSize: '150% 150%',
+            animation: 'flow-gradient 20s ease infinite',
+          });
+        })
+        .catch((e: any) => {
+          console.error("Error getting color from track cover:", e);
+        });
+    };
+
+    if (imageElement.complete) {
+      extractColor();
+    } else {
+      imageElement.addEventListener('load', extractColor);
+    }
+    
+    return () => {
+      if (imageElement) {
+        imageElement.removeEventListener('load', extractColor);
+      }
+      fac.destroy();
+    };
+  }, [track.id]);
 
   const handleSeek = (event: React.ChangeEvent<HTMLInputElement>) => {
     onSeek(Number(event.target.value));
@@ -41,7 +95,10 @@ const Player: React.FC<PlayerProps> = ({ track, isPlaying, progress, onPlayPause
   };
 
   return (
-    <div className="fixed inset-0 w-full h-full overflow-hidden bg-background">
+    <div
+      className="relative w-full h-full overflow-hidden transition-colors duration-1000"
+      style={gradientStyle}
+    >
       <div className="relative w-full h-full flex flex-col items-center text-text p-4 sm:p-8">
         
         <header className="w-full max-w-md flex justify-between items-center">
@@ -55,10 +112,12 @@ const Player: React.FC<PlayerProps> = ({ track, isPlaying, progress, onPlayPause
 
         <main key={track.id} className="flex-grow w-full flex flex-col items-center justify-center text-center pt-4 animate-fadeInScaleUp">
           <div className="relative w-64 h-64 sm:w-72 sm:h-72 md:w-80 md:h-80 rounded-2xl bg-surface shadow-2xl shadow-black/30 mb-8 overflow-hidden">
-            <img 
+            <TrackCover
+              ref={imageRef}
+              crossOrigin="anonymous"
               src={track.coverUrl} 
               alt={track.title} 
-              className="absolute inset-0 w-full h-full object-cover"
+              className="absolute inset-0 w-full h-full"
             />
           </div>
           <h1 className="text-3xl sm:text-4xl font-black tracking-tight mb-2 text-primary">

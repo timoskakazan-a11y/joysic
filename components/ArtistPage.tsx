@@ -1,7 +1,7 @@
-
-import React, { useState, useEffect } from 'react';
-import type { Artist, Playlist } from '../types';
-import { PlayIcon, PauseIcon, ChevronLeftIcon, SoundWaveIcon } from './IconComponents';
+import React, { useState, useEffect, useMemo } from 'react';
+import type { Artist, Playlist, Track } from '../types';
+import { PlayIcon, HeartIcon, ChevronLeftIcon, SoundWaveIcon } from './IconComponents';
+import TrackCover from './TrackCover';
 
 const AnimatedPlaceholder: React.FC<{ className?: string }> = ({ className }) => (
     <div className={`bg-surface-light animate-pulse ${className}`} />
@@ -16,11 +16,17 @@ interface ArtistPageProps {
   isPlaying: boolean;
   likedArtistIds: string[];
   onToggleLikeArtist: (artistId: string) => void;
+  likedTrackIds: string[];
+  onToggleLikeTrack: (trackId: string) => void;
 }
 
-const ArtistPage: React.FC<ArtistPageProps> = ({ artist, onBack, onPlayTrack, onSelectPlaylist, currentTrackId, isPlaying, likedArtistIds, onToggleLikeArtist }) => {
+const ArtistPage: React.FC<ArtistPageProps> = ({ artist, onBack, onPlayTrack, onSelectPlaylist, currentTrackId, isPlaying, likedArtistIds, onToggleLikeArtist, likedTrackIds, onToggleLikeTrack }) => {
   const [isImageLoaded, setIsImageLoaded] = useState(false);
   const isLiked = likedArtistIds.includes(artist.id);
+
+  const sortedTracks = useMemo(() => 
+    [...artist.tracks].sort((a, b) => (b.listens || 0) - (a.listens || 0)),
+  [artist.tracks]);
 
   useEffect(() => {
     setIsImageLoaded(false); 
@@ -93,7 +99,7 @@ const ArtistPage: React.FC<ArtistPageProps> = ({ artist, onBack, onPlayTrack, on
                     {artist.albums.map(album => (
                         <div key={album.id} onClick={() => onSelectPlaylist(album)} className="group cursor-pointer">
                             <div className="relative aspect-square w-full rounded-2xl shadow-lg overflow-hidden bg-surface">
-                                <img src={album.coverUrl} alt={album.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                                <TrackCover src={album.coverUrl} alt={album.name} className="w-full h-full transition-transform duration-500 group-hover:scale-110" />
                             </div>
                             <div className="mt-3">
                                 <h3 className="font-bold text-primary truncate">{album.name}</h3>
@@ -108,8 +114,9 @@ const ArtistPage: React.FC<ArtistPageProps> = ({ artist, onBack, onPlayTrack, on
         <div className="mt-12">
           <h2 className="text-2xl font-bold text-primary mb-4">Популярные треки</h2>
           <div className="space-y-2">
-            {artist.tracks.length > 0 ? artist.tracks.map((track, index) => {
+            {sortedTracks.length > 0 ? sortedTracks.map((track, index) => {
               const isActive = track.id === currentTrackId;
+              const isTrackLiked = likedTrackIds.includes(track.id);
               return (
               <div
                 key={track.id}
@@ -131,10 +138,19 @@ const ArtistPage: React.FC<ArtistPageProps> = ({ artist, onBack, onPlayTrack, on
                     )}
                 </div>
                 <div className="relative w-12 h-12 rounded-md bg-surface overflow-hidden flex-shrink-0">
-                  <img src={track.coverUrl} alt={track.title} className="w-full h-full object-cover" />
+                  <TrackCover src={track.coverUrl} alt={track.title} className="w-full h-full" />
                 </div>
                 <div className="flex-grow mx-4">
                   <p className={`font-semibold ${isActive ? 'text-accent' : 'text-text'}`}>{track.title}</p>
+                </div>
+                <div className="flex items-center gap-4 text-text-secondary text-sm">
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); onToggleLikeTrack(track.id); }} 
+                      className={`${isTrackLiked ? 'text-accent' : 'text-text-secondary'} hover:text-primary transition-colors`}
+                      aria-label={isTrackLiked ? 'Убрать лайк' : 'Поставить лайк'}
+                    >
+                        <HeartIcon filled={isTrackLiked} className="w-5 h-5" />
+                    </button>
                 </div>
               </div>
             )}) : (
