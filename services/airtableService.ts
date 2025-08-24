@@ -91,7 +91,8 @@ export const registerUser = async (email: string, password: string, name: string
                     'Описание': 'Ваши любимые треки',
                     'Обложка': [{ url: coverUrl }],
                     'пользователи': [newUserId],
-                    'Тип': 'встроенный'
+                    'Тип': 'встроенный',
+                    'Альбом/Плейлист': 'плейлист'
                 }
             }]
         })
@@ -251,22 +252,67 @@ export const fetchTracks = async (): Promise<Track[]> => {
 };
 
 export const fetchArtistDetails = async (artistId: string): Promise<Artist> => {
+    // 1. Fetch main artist record
     const artistRecord: AirtableArtistRecord = await fetchFromAirtable(ARTISTS_TABLE_NAME, {}, `/${artistId}`);
     const artistName = artistRecord.fields['Имя'] || 'Unknown Artist';
-    const trackIds = artistRecord.fields['Треки'];
-    let tracks: Track[] = [];
 
-    if (trackIds && trackIds.length > 0) {
-        const formula = "OR(" + trackIds.map(id => `RECORD_ID() = '${id}'`).join(',') + ")";
-        const tracksResponse = await fetchFromAirtable(MUSIC_TABLE_NAME, {}, `?filterByFormula=${encodeURIComponent(formula)}`);
-        const artistTracksRecords: { records: AirtableTrackRecord[] } = tracksResponse;
-        const artistMap = new Map<string, string>([[artistId, artistName]]);
-        tracks = artistTracksRecords.records.map(record => mapAirtableRecordToTrack(record, artistMap)).filter((track): track is Track => track !== null);
+    // 2. Fetch all playlists and albums, then filter in code. This is more robust than a complex formula.
+    const allPlaylistsResponse = await fetchFromAirtable(PLAYLISTS_TABLE_NAME, {});
+    const allPlaylistRecords: AirtablePlaylistRecord[] = allPlaylistsResponse.records || [];
+
+    const artistAlbumRecords = allPlaylistRecords.filter(record => 
+        record.fields['Исполнитель']?.includes(artistId) &&
+        record.fields['Альбом/Плейлист'] === 'альбом'
+    );
+    
+    const albums: Playlist[] = artistAlbumRecords
+        .map(mapAirtableRecordToPlaylist)
+        .filter((p): p is Playlist => p !== null);
+
+    // 3. Gather all unique track IDs from the artist's main tracks and all their albums
+    const artistTrackIds = artistRecord.fields['Треки'] || [];
+    const albumTrackIds = albums.flatMap(album => album.trackIds);
+    const allTrackIds = [...new Set([...artistTrackIds, ...albumTrackIds])];
+
+    let allTracks: Track[] = [];
+
+    // 4. Fetch all unique tracks if any exist
+    if (allTrackIds.length > 0) {
+        const trackFormula = "OR(" + allTrackIds.map(id => `RECORD_ID() = '${id}'`).join(',') + ")";
+        const tracksResponse = await fetchFromAirtable(MUSIC_TABLE_NAME, {}, `?filterByFormula=${encodeURIComponent(trackFormula)}`);
+        const trackRecords: AirtableTrackRecord[] = tracksResponse.records || [];
+        
+        // We need a map of all artists to correctly assign artist names to tracks, especially for collaborations.
+        const artistsResponse = await fetchFromAirtable(ARTISTS_TABLE_NAME);
+        const artistMap = new Map<string, string>();
+        artistsResponse.records.forEach((record: any) => {
+          if (record.fields['Имя']) artistMap.set(record.id, record.fields['Имя']);
+        });
+
+        allTracks = trackRecords
+            .map(record => mapAirtableRecordToTrack(record, artistMap))
+            .filter((track): track is Track => track !== null);
     }
-    const photoAttachment = artistRecord.fields['Фото'] && artistRecord.fields['Фото'][0];
-    const photoUrl = (photoAttachment && photoAttachment.thumbnails && photoAttachment.thumbnails.large && photoAttachment.thumbnails.large.url) || (photoAttachment && photoAttachment.url);
 
-    return { id: artistRecord.id, name: artistName, description: artistRecord.fields['Описание'], status: artistRecord.fields['Status'], photoUrl: photoUrl, tracks: tracks };
+    // 5. Populate the tracks for the main artist object and for each album
+    const tracksForArtistPage = allTracks.filter(track => artistTrackIds.includes(track.id));
+    albums.forEach(album => {
+        album.tracks = allTracks.filter(track => album.trackIds.includes(track.id));
+    });
+
+    const photoAttachment = artistRecord.fields['Фото']?.[0];
+    const photoUrl = photoAttachment?.thumbnails?.large?.url || photoAttachment?.url;
+
+    // 6. Return the fully populated Artist object
+    return {
+        id: artistRecord.id,
+        name: artistName,
+        description: artistRecord.fields['Описание'],
+        status: artistRecord.fields['Status'],
+        photoUrl: photoUrl,
+        tracks: tracksForArtistPage,
+        albums: albums
+    };
 };
 
 const mapAirtableRecordToPlaylist = (record: AirtablePlaylistRecord): Playlist | null => {
@@ -274,6 +320,10 @@ const mapAirtableRecordToPlaylist = (record: AirtablePlaylistRecord): Playlist |
     if (!fields['Название'] || !fields['Обложка']?.[0]?.url) {
         return null;
     }
+    const type = fields['Тип'] || 'пользовательский';
+    // A 'built-in' playlist must always be of collection type 'playlist', regardless of Airtable data.
+    const collectionType = type === 'встроенный' ? 'плейлист' : (fields['Альбом/Плейлист'] || 'плейлист');
+
     return {
         id: record.id,
         name: fields['Название'],
@@ -282,7 +332,9 @@ const mapAirtableRecordToPlaylist = (record: AirtablePlaylistRecord): Playlist |
         trackIds: fields['Песни'] || [],
         tracks: [], // to be populated later
         isFavorites: false, // will be set later
-        type: fields['Тип'] || 'пользовательский',
+        type: type,
+        collectionType: collectionType,
+        artistId: fields['Исполнитель']?.[0],
     };
 };
 
@@ -334,5 +386,5 @@ export const fetchPlaylistsForUser = async (userId: string): Promise<Playlist[]>
     
     return Array.from(playlistsMap.values())
         .map(mapAirtableRecordToPlaylist)
-        .filter((p): p is Playlist => p !== null);
+        .filter((p): p is Playlist => p !== null && p.collectionType === 'плейлист');
 };

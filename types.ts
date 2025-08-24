@@ -23,6 +23,7 @@ export interface Artist {
     status?: string;
     photoUrl?: string;
     tracks: Track[];
+    albums: Playlist[];
 }
 
 export interface User {
@@ -43,6 +44,8 @@ export interface Playlist {
   tracks: Track[];
   isFavorites: boolean;
   type: 'встроенный' | 'пользовательский';
+  collectionType: 'альбом' | 'плейлист';
+  artistId?: string;
 }
 
 export interface AirtableThumbnail {
@@ -112,5 +115,7 @@ export interface AirtablePlaylistRecord {
     'Песни'?: string[];
     'пользователи'?: string[];
     'Тип'?: 'встроенный' | 'пользовательский';
+    'Альбом/Плейлист'?: 'альбом' | 'плейлист';
+    'Исполнитель'?: string[];
   }
 }

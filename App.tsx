@@ -305,6 +305,7 @@ const App: React.FC = () => {
                     isPlaying={isPlaying}
                     likedArtistIds={user.likedArtistIds}
                     onToggleLikeArtist={(artistId) => handleToggleLike('artist', artistId)}
+                    onSelectPlaylist={handleSelectPlaylist}
                 />
             );
         case 'playlistDetail':

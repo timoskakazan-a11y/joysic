@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import type { Artist } from '../types';
+import type { Artist, Playlist } from '../types';
 import { PlayIcon, PauseIcon, ChevronLeftIcon, SoundWaveIcon } from './IconComponents';
 
 const AnimatedPlaceholder: React.FC<{ className?: string }> = ({ className }) => (
@@ -11,13 +11,14 @@ interface ArtistPageProps {
   artist: Artist;
   onBack: () => void;
   onPlayTrack: (trackId: string) => void;
+  onSelectPlaylist: (playlist: Playlist) => void;
   currentTrackId?: string | null;
   isPlaying: boolean;
   likedArtistIds: string[];
   onToggleLikeArtist: (artistId: string) => void;
 }
 
-const ArtistPage: React.FC<ArtistPageProps> = ({ artist, onBack, onPlayTrack, currentTrackId, isPlaying, likedArtistIds, onToggleLikeArtist }) => {
+const ArtistPage: React.FC<ArtistPageProps> = ({ artist, onBack, onPlayTrack, onSelectPlaylist, currentTrackId, isPlaying, likedArtistIds, onToggleLikeArtist }) => {
   const [isImageLoaded, setIsImageLoaded] = useState(false);
   const isLiked = likedArtistIds.includes(artist.id);
 
@@ -85,8 +86,27 @@ const ArtistPage: React.FC<ArtistPageProps> = ({ artist, onBack, onPlayTrack, cu
           </div>
         )}
 
-        <div>
-          <h2 className="text-2xl font-bold text-primary mb-4">Треки</h2>
+        {artist.albums.length > 0 && (
+            <div className="mt-12">
+                <h2 className="text-2xl font-bold text-primary mb-4">Альбомы</h2>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
+                    {artist.albums.map(album => (
+                        <div key={album.id} onClick={() => onSelectPlaylist(album)} className="group cursor-pointer">
+                            <div className="relative aspect-square w-full rounded-2xl shadow-lg overflow-hidden bg-surface">
+                                <img src={album.coverUrl} alt={album.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                            </div>
+                            <div className="mt-3">
+                                <h3 className="font-bold text-primary truncate">{album.name}</h3>
+                                <p className="text-sm text-text-secondary">{album.tracks.length} треков</p>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        )}
+
+        <div className="mt-12">
+          <h2 className="text-2xl font-bold text-primary mb-4">Популярные треки</h2>
           <div className="space-y-2">
             {artist.tracks.length > 0 ? artist.tracks.map((track, index) => {
               const isActive = track.id === currentTrackId;
