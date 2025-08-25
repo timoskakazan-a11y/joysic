@@ -65,12 +65,12 @@ const SearchResultTrack = React.memo<{track: Track, isActive: boolean, isPlaying
         <div className="relative w-12 h-12 rounded-md bg-surface overflow-hidden flex-shrink-0">
           <TrackCover src={track.coverUrl} alt={track.title} className="w-full h-full" />
         </div>
-        <div className="flex-grow mx-4 flex justify-between items-start gap-4">
-            <div>
-                <p className={`font-semibold ${isActive ? 'text-accent' : 'text-text'}`}>{track.title}</p>
-                <p className="text-sm text-text-secondary">{track.artists.map(a => a.name).join(', ')}</p>
-            </div>
-            {track.mat && <div className="flex-shrink-0"><MatBadge onClick={onOpenMatInfo} /></div>}
+        <div className="flex-grow mx-4 overflow-hidden">
+          <div className="flex items-baseline gap-2">
+              <p className={`font-semibold ${isActive ? 'text-accent' : 'text-text'}`}>{track.title}</p>
+              {track.mat && <MatBadge onClick={onOpenMatInfo} className="flex-shrink-0"/>}
+          </div>
+          <p className="text-sm text-text-secondary">{track.artists.map(a => a.name).join(', ')}</p>
         </div>
         {isActive && (
             <SoundWaveIcon isPlaying={!!isPlaying} className="w-5 h-5 mx-auto text-accent flex-shrink-0" />
