@@ -16,9 +16,8 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ onClose, onScanSuccess }) =
 
     useEffect(() => {
         // This effect manages the entire lifecycle of the scanner.
-        // It runs only once when the component mounts and cleans up on unmount.
         
-        const scanner = new Html5Qrcode(scannerContainerId);
+        const scanner = new Html5Qrcode(scannerContainerId, false);
         scannerInstanceRef.current = scanner;
 
         const successCallback = (decodedText: string) => {
@@ -47,30 +46,28 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ onClose, onScanSuccess }) =
                 return { width: size, height: size };
             },
         };
-
-        // Explicitly get cameras to find the rear-facing one. This is more reliable.
-        Html5Qrcode.getCameras().then((devices: any[]) => {
-            if (devices && devices.length) {
-                // Find the rear camera using the 'environment' facing mode standard.
-                const rearCamera = devices.find((device: any) => device.facing === 'environment');
-                const cameraId = rearCamera ? rearCamera.id : devices[0].id; // Fallback to the first camera if no rear camera is found.
-
-                scanner.start(
-                    cameraId, // Use the specific camera ID
-                    config,
-                    successCallback,
-                    errorCallback
-                ).catch((err: any) => {
-                    console.error("Unable to start scanning with selected camera.", err);
-                    setError("Не удалось запустить камеру. Проверьте разрешения в настройках браузера.");
-                });
-            } else {
-                 setError("Камеры не найдены на этом устройстве.");
-            }
-        }).catch((err: any) => {
-            console.error("Error getting camera list.", err);
-            setError("Не удалось получить доступ к камере. Убедитесь, что вы предоставили разрешение.");
+        
+        // Start the scanner, requesting the rear camera ('environment').
+        // This is the most reliable method for mobile devices.
+        scanner.start(
+            { facingMode: 'environment' },
+            config,
+            successCallback,
+            errorCallback
+        ).catch((err: any) => {
+            console.warn("Failed to start with rear camera, trying any camera as a fallback.", err);
+            // If the rear camera fails (e.g., on a desktop), fallback to any available camera.
+            scanner.start(
+                undefined, // `undefined` lets the library select the default camera.
+                config,
+                successCallback,
+                errorCallback
+            ).catch((fallbackErr: any) => {
+                console.error("Unable to start scanner with any camera.", fallbackErr);
+                setError("Не удалось запустить камеру. Проверьте разрешения в настройках браузера.");
+            });
         });
+
 
         // The cleanup function is critical. It runs when the component unmounts.
         return () => {
