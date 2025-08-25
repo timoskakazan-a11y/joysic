@@ -1,4 +1,5 @@
 
+
 import type { Track, Artist, AirtableTrackRecord, AirtableArtistRecord, User, AirtableUserRecord, Playlist, AirtablePlaylistRecord, Artwork, AirtableAttachment, SimpleArtist } from '../types';
 
 const AIRTABLE_BASE_ID = 'appuGObKAO57IqWRN';
@@ -38,14 +39,7 @@ const mapAirtableRecordToUser = (record: AirtableUserRecord): User => {
         favoriteCollectionIds: record.fields['Любимый плейлист'] || [],
         avatarUrl: record.fields['Аватар']?.[0]?.url,
         totalListeningMinutes: parseInt(record.fields['Время прослушивания'] || '0', 10) || 0,
-        lastPlayedTrackId: record.fields['Последний трек']?.[0],
-        lastPlayedSecond: record.fields['Секунда последнего трека'],
     };
-};
-
-export const fetchUserById = async (userId: string): Promise<User> => {
-    const response = await fetchFromAirtable(USERS_TABLE_NAME, {}, `/${userId}`);
-    return mapAirtableRecordToUser(response);
 };
 
 export const fetchMediaUrl = async (name: string): Promise<string | null> => {
@@ -233,10 +227,8 @@ export const incrementTrackStats = async (trackId: string, field: 'Лайки' |
     });
 };
 
-export const updateUserPlayerState = async (userId: string, trackId: string, currentTime: number, totalMinutes: number): Promise<void> => {
+export const updateUserListeningTime = async (userId: string, totalMinutes: number): Promise<void> => {
     const fieldsToUpdate = {
-        'Последний трек': [trackId],
-        'Секунда последнего трека': Math.round(currentTime),
         'Время прослушивания': String(totalMinutes),
     };
 
@@ -345,6 +337,15 @@ export const fetchArtistDetails = async (artistId: string): Promise<Artist> => {
         .map(mapAirtableRecordToPlaylist)
         .filter((p): p is Playlist => p !== null);
 
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const unreleasedAlbumTrackIds = new Set<string>();
+    albums.forEach(album => {
+        if (album.releaseDate && new Date(album.releaseDate) >= today) {
+            album.trackIds.forEach(trackId => unreleasedAlbumTrackIds.add(trackId));
+        }
+    });
+
     // 3. Gather all unique track IDs from the artist's main tracks and all their albums
     const artistTrackIds = artistRecord.fields['Треки'] || [];
     const albumTrackIds = albums.flatMap(album => album.trackIds);
@@ -372,8 +373,10 @@ export const fetchArtistDetails = async (artistId: string): Promise<Artist> => {
             .filter((track): track is Track => track !== null);
     }
 
+    const allReleasedTracks = allTracks.filter(track => !unreleasedAlbumTrackIds.has(track.id));
+    
     // 5. Populate the tracks for the main artist object and for each album
-    const tracksForArtistPage = allTracks.filter(track => artistTrackIds.includes(track.id));
+    const tracksForArtistPage = allReleasedTracks.filter(track => artistTrackIds.includes(track.id));
     albums.forEach(album => {
         album.tracks = allTracks.filter(track => album.trackIds.includes(track.id));
     });

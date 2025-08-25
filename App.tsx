@@ -1,7 +1,7 @@
 
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { fetchTracks, fetchArtistDetails, loginUser, registerUser, updateUserLikes, fetchPlaylistsForUser, incrementTrackStats, fetchBetaImage, fetchSimpleArtistsByIds, fetchUserById, updateUserPlayerState } from './services/airtableService';
+import { fetchTracks, fetchArtistDetails, loginUser, registerUser, updateUserLikes, fetchPlaylistsForUser, incrementTrackStats, fetchBetaImage, fetchSimpleArtistsByIds, updateUserListeningTime } from './services/airtableService';
 import type { Track, Artist, User, Playlist, SimpleArtist } from './types';
 import Player from './components/Player';
 import ArtistPage from './components/ArtistPage';
@@ -61,9 +61,6 @@ const App: React.FC = () => {
   const userRef = useRef(user);
   useEffect(() => { userRef.current = user; }, [user]);
 
-  const currentTrackRef = useRef(currentTrack);
-  useEffect(() => { currentTrackRef.current = currentTrack; }, [currentTrack]);
-
 
   useEffect(() => {
     const checkBetaStatus = async () => {
@@ -87,29 +84,23 @@ const App: React.FC = () => {
   useEffect(() => {
     if (isCheckingBeta || isBetaLocked) return;
 
-    const authenticateAndSyncUser = async () => {
+    const authenticateUser = () => {
       const savedUserString = localStorage.getItem('joysicUser');
       if (savedUserString) {
-        let userToSet: User | null = null;
         try {
-          userToSet = JSON.parse(savedUserString); // Parse once
-          // Prioritize fetching the latest state from the server.
-          const latestUser = await fetchUserById(userToSet.id);
-          userToSet = latestUser; // If fetch succeeds, update the user to set
-          localStorage.setItem('joysicUser', JSON.stringify(latestUser));
+          setUser(JSON.parse(savedUserString));
         } catch (error) {
-          console.error("Failed to sync user state, using local data as fallback.", error);
-          // If fetch fails, userToSet remains the parsed local user, which is what we want.
+          console.error("Failed to parse user from localStorage", error);
+          localStorage.removeItem('joysicUser');
         }
-        setUser(userToSet);
       }
       setIsAuthLoading(false);
     };
 
-    authenticateAndSyncUser();
+    authenticateUser();
   }, [isCheckingBeta, isBetaLocked]);
   
-  // Effect for tracking and synchronizing player state in the background
+  // Effect for tracking listening time in the background
   useEffect(() => {
     if (playerSyncInterval.current) {
       clearInterval(playerSyncInterval.current);
@@ -118,10 +109,8 @@ const App: React.FC = () => {
     if (isPlaying) {
       playerSyncInterval.current = setInterval(() => {
         const currentUser = userRef.current;
-        const track = currentTrackRef.current;
-        const audio = audioRef.current;
 
-        if (!currentUser || !track || !audio) return;
+        if (!currentUser) return;
 
         // Increment time and update user ref without causing a re-render
         const newTotalMinutes = (currentUser.totalListeningMinutes || 0) + (5 / 60);
@@ -129,13 +118,11 @@ const App: React.FC = () => {
         userRef.current = updatedUserForStorage;
         localStorage.setItem('joysicUser', JSON.stringify(updatedUserForStorage));
         
-        updateUserPlayerState(
+        updateUserListeningTime(
             currentUser.id,
-            track.id,
-            audio.currentTime,
             newTotalMinutes
         ).catch(err => {
-            console.error("Failed to sync player state:", err);
+            console.error("Failed to update listening time:", err);
         });
 
       }, 5000);
@@ -158,8 +145,20 @@ const App: React.FC = () => {
         fetchSimpleArtistsByIds(currentUser.likedArtistIds),
       ]);
       
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const allAlbums = [...fetchedPlaylists, ...fetchedLikedAlbums].filter(p => p.collectionType === 'альбом');
+      const unreleasedTrackIds = new Set<string>();
+      allAlbums.forEach(album => {
+        if (album.releaseDate && new Date(album.releaseDate) >= today) {
+          album.trackIds.forEach(tid => unreleasedTrackIds.add(tid));
+        }
+      });
+      
+      const releasedTracks = fetchedTracks.filter(track => !unreleasedTrackIds.has(track.id));
+      setTracks(releasedTracks);
+      
       setFavoritesPlaylistId(favId);
-      setTracks(fetchedTracks);
       setLikedArtists(fetchedLikedArtists);
       
       const populateCollectionTracks = (collection: Playlist) => ({
@@ -190,19 +189,6 @@ const App: React.FC = () => {
       loadAppData(user);
     }
   }, [user, tracks.length, loadAppData]);
-
-  // Effect to handle setting initial track after user and tracks are loaded from sync
-  useEffect(() => {
-    if (user?.lastPlayedTrackId && tracks.length > 0 && currentTrackIndex === null) {
-        const lastTrack = tracks.find(t => t.id === user.lastPlayedTrackId);
-        if (lastTrack) {
-            setShuffledTracks([lastTrack]);
-            setCurrentTrackIndex(0);
-            setIsPlaying(false);
-            setInitialSeekTime(user.lastPlayedSecond || 0);
-        }
-    }
-  }, [user, tracks, currentTrackIndex]);
 
   useEffect(() => {
     const audio = audioRef.current;

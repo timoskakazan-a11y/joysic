@@ -40,8 +40,6 @@ export interface User {
   favoriteCollectionIds: string[];
   avatarUrl?: string;
   totalListeningMinutes?: number;
-  lastPlayedTrackId?: string;
-  lastPlayedSecond?: number;
 }
 
 export interface SimpleArtist {
@@ -127,8 +125,6 @@ export interface AirtableUserRecord {
         'Любимый плейлист'?: string[];
         'Аватар'?: AirtableAttachment[];
         'Время прослушивания'?: string;
-        'Последний трек'?: string[];
-        'Секунда последнего трека'?: number;
     }
 }
 
