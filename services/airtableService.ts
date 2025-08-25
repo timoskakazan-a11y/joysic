@@ -377,6 +377,7 @@ const mapAirtableRecordToPlaylist = (record: AirtablePlaylistRecord): Playlist |
         type: type,
         collectionType: collectionType,
         artistId: fields['Исполнитель']?.[0],
+        releaseDate: fields['Дата выхода'],
     };
 };
 

@@ -58,6 +58,7 @@ export interface Playlist {
   type: 'встроенный' | 'пользовательский';
   collectionType: 'альбом' | 'плейлист';
   artistId?: string;
+  releaseDate?: string;
 }
 
 export interface AirtableThumbnail {
@@ -132,5 +133,6 @@ export interface AirtablePlaylistRecord {
     'Тип'?: 'встроенный' | 'пользовательский';
     'Альбом/Плейлист'?: 'альбом' | 'плейлист';
     'Исполнитель'?: string[];
+    'Дата выхода'?: string;
   }
 }

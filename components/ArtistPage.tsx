@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import type { Artist, Playlist, Track } from '../types';
 import { PlayIcon, HeartIcon, ChevronLeftIcon, SoundWaveIcon } from './IconComponents';
@@ -27,6 +28,15 @@ const ArtistPage: React.FC<ArtistPageProps> = ({ artist, onBack, onPlayTrack, on
   const sortedTracks = useMemo(() => 
     [...artist.tracks].sort((a, b) => (b.listens || 0) - (a.listens || 0)),
   [artist.tracks]);
+
+  const sortedAlbums = useMemo(() => 
+    artist.albums
+      .slice()
+      .sort((a, b) => {
+        if (!a.releaseDate || !b.releaseDate) return 0;
+        return new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime();
+      }),
+  [artist.albums]);
 
   useEffect(() => {
     setIsImageLoaded(false); 
@@ -92,12 +102,13 @@ const ArtistPage: React.FC<ArtistPageProps> = ({ artist, onBack, onPlayTrack, on
           </div>
         )}
 
-        {artist.albums.length > 0 && (
+        {sortedAlbums.length > 0 && (
             <div className="mt-12">
                 <h2 className="text-2xl font-bold text-primary mb-4">Альбомы</h2>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
-                    {artist.albums.map(album => {
+                    {sortedAlbums.map(album => {
                         const isAlbumLiked = favoriteCollectionIds.includes(album.id);
+                        const releaseYear = album.releaseDate ? new Date(album.releaseDate).getFullYear() : null;
                         return (
                         <div key={album.id} className="group">
                             <div className="relative aspect-square w-full rounded-2xl shadow-lg overflow-hidden bg-surface cursor-pointer" onClick={() => onSelectPlaylist(album)}>
@@ -111,7 +122,9 @@ const ArtistPage: React.FC<ArtistPageProps> = ({ artist, onBack, onPlayTrack, on
                             <div className="mt-3 flex justify-between items-start">
                                 <div className="overflow-hidden mr-2" onClick={() => onSelectPlaylist(album)}>
                                     <h3 className="font-bold text-primary truncate cursor-pointer">{album.name}</h3>
-                                    <p className="text-sm text-text-secondary">{album.tracks.length} треков</p>
+                                    <p className="text-sm text-text-secondary">
+                                      {releaseYear ? `${releaseYear} • ` : ''}{album.tracks.length} треков
+                                    </p>
                                 </div>
                                 <button
                                   onClick={() => onToggleLike('album', album.id)}
