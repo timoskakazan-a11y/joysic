@@ -21,7 +21,7 @@ const MiniPlayer: React.FC<MiniPlayerProps> = ({ track, isPlaying, progress, onP
   return (
     <div className="px-2 pb-2" onClick={onExpand} >
         <div 
-            className="relative h-16 bg-surface rounded-xl flex items-center p-2 cursor-pointer border border-surface-light shadow-2xl backdrop-blur-lg bg-opacity-80"
+            className="relative h-16 bg-surface rounded-xl flex items-center p-2 cursor-pointer border border-surface-light shadow-2xl backdrop-blur-lg bg-opacity-80 overflow-hidden"
             aria-label="Expand player"
             role="button"
         >
