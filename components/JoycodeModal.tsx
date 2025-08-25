@@ -10,40 +10,42 @@ interface JoycodeModalProps {
 const JoycodeModal: React.FC<JoycodeModalProps> = ({ track, onClose }) => {
   return (
     <div 
-      className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-fadeInScaleUp"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-fadeInScaleUp"
       onClick={onClose}
     >
+      {/* Blurred background */}
       <div 
-        className="bg-surface rounded-3xl shadow-2xl p-6 sm:p-8 w-full max-w-sm text-center border border-surface-light"
+        className="absolute inset-0 bg-cover bg-center transition-opacity duration-500"
+        style={{
+          backgroundImage: `url(${track.coverUrl})`,
+          filter: 'blur(24px)',
+        }}
+      />
+      <div className="absolute inset-0 bg-black/60" />
+
+      {/* Glassmorphism Card */}
+      <div 
+        className="relative bg-white/10 backdrop-blur-xl rounded-3xl shadow-2xl w-full max-w-sm text-center border border-white/10 overflow-hidden"
         onClick={e => e.stopPropagation()}
       >
-        <img 
-          src={track.coverUrl} 
-          alt={track.title} 
-          className="w-32 h-32 object-cover rounded-2xl mx-auto -mt-20 mb-4 shadow-lg border-4 border-surface"
-        />
-        <h2 className="text-2xl font-bold text-primary truncate">{track.title}</h2>
-        <p className="text-text-secondary mb-6">{track.artist}</p>
-        
-        <div className="bg-surface-light p-2 rounded-2xl">
-          <div className="bg-white rounded-xl overflow-hidden flex justify-center items-center p-4">
-            <Barcode 
-                value={track.id} 
-                options={{
-                    width: 200,
-                }}
+        <div className="p-8 flex flex-col items-center gap-6">
+            <img 
+              src={track.coverUrl} 
+              alt={track.title} 
+              className="w-40 h-40 object-cover rounded-2xl mx-auto shadow-lg"
             />
-          </div>
+            
+            <div className="w-full">
+                <h2 className="text-2xl font-bold text-primary truncate">{track.title}</h2>
+                <p className="text-text-secondary">{track.artist}</p>
+            </div>
+            
+            <div className="bg-white p-4 rounded-2xl">
+                <Barcode 
+                    value={track.id} 
+                />
+            </div>
         </div>
-
-        <p className="text-xs text-text-secondary mt-4">Отсканируйте этот Joycode в приложении, чтобы поделиться треком.</p>
-
-        <button
-          onClick={onClose}
-          className="mt-6 bg-accent text-background font-bold py-3 px-8 rounded-full hover:bg-opacity-80 transition-opacity duration-200"
-        >
-          Закрыть
-        </button>
       </div>
     </div>
   );
