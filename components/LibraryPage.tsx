@@ -20,7 +20,7 @@ interface LibraryPageProps {
   isPlaying?: boolean;
 }
 
-const PlaylistCard: React.FC<{ playlist: Playlist; onSelect: () => void }> = ({ playlist, onSelect }) => (
+const PlaylistCard = React.memo<{ playlist: Playlist; onSelect: () => void }>(({ playlist, onSelect }) => (
   <div onClick={onSelect} className="group cursor-pointer">
     <div className="relative aspect-square w-full rounded-2xl shadow-lg overflow-hidden bg-surface">
       {playlist.coverType === 'video' && playlist.coverVideoUrl ? (
@@ -34,9 +34,9 @@ const PlaylistCard: React.FC<{ playlist: Playlist; onSelect: () => void }> = ({ 
       <p className="text-sm text-text-secondary">{playlist.tracks.length} треков</p>
     </div>
   </div>
-);
+));
 
-const ArtistCard: React.FC<{ artist: SimpleArtist; onSelect: () => void }> = ({ artist, onSelect }) => (
+const ArtistCard = React.memo<{ artist: SimpleArtist; onSelect: () => void }>(({ artist, onSelect }) => (
   <div onClick={onSelect} className="group cursor-pointer flex-shrink-0 w-32 sm:w-36 text-center">
     <div className="relative aspect-square w-full rounded-full shadow-lg overflow-hidden bg-surface transition-transform duration-300 group-hover:scale-105">
       <img src={artist.photoUrl || 'https://i.postimg.cc/G3K2BYkT/joysic.png'} alt={artist.name} className="w-full h-full object-cover" />
@@ -45,9 +45,9 @@ const ArtistCard: React.FC<{ artist: SimpleArtist; onSelect: () => void }> = ({ 
       <h3 className="font-bold text-primary truncate">{artist.name}</h3>
     </div>
   </div>
-);
+));
 
-const SearchResultTrack: React.FC<{track: Track, isActive: boolean, isPlaying: boolean, onPlay: () => void}> = ({ track, isActive, isPlaying, onPlay }) => {
+const SearchResultTrack = React.memo<{track: Track, isActive: boolean, isPlaying: boolean, onPlay: () => void}>(({ track, isActive, isPlaying, onPlay }) => {
     return (
       <div
         onClick={onPlay}
@@ -65,7 +65,7 @@ const SearchResultTrack: React.FC<{track: Track, isActive: boolean, isPlaying: b
         )}
       </div>
     );
-};
+});
 
 const LibraryPage: React.FC<LibraryPageProps> = ({ user, playlists, likedAlbums, likedArtists, tracks, onSelectPlaylist, onSelectArtist, onPlayTrack, onShufflePlayAll, onNavigateToProfile, onOpenScanner, currentTrackId, isPlaying }) => {
   const [searchQuery, setSearchQuery] = useState('');

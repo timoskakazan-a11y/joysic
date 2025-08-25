@@ -51,9 +51,16 @@ const App: React.FC = () => {
   const [scannedTrackId, setScannedTrackId] = useState<string | null>(null);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const listenTimeTracker = useRef({ sessionSeconds: 0 });
   const playerStateUpdateInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+  
   const currentTrack = currentTrackIndex !== null && shuffledTracks.length > 0 ? shuffledTracks[currentTrackIndex] : null;
+
+  const userRef = useRef(user);
+  useEffect(() => { userRef.current = user; }, [user]);
+
+  const currentTrackRef = useRef(currentTrack);
+  useEffect(() => { currentTrackRef.current = currentTrack; }, [currentTrack]);
+
 
   useEffect(() => {
     const checkBetaStatus = async () => {
@@ -84,25 +91,37 @@ const App: React.FC = () => {
     setIsAuthLoading(false);
   }, [isCheckingBeta, isBetaLocked]);
   
-  // Effect for tracking and synchronizing player state
+  // Effect for tracking and synchronizing player state in the background
   useEffect(() => {
-    if (isPlaying && user && currentTrack && audioRef.current) {
-      // Start interval to save state every 5 seconds
+    if (playerStateUpdateInterval.current) {
+      clearInterval(playerStateUpdateInterval.current);
+    }
+
+    if (isPlaying) {
       playerStateUpdateInterval.current = setInterval(() => {
-        const newTotalMinutes = (user.totalListeningMinutes || 0) + (5 / 60);
+        const currentUser = userRef.current;
+        const currentAudio = audioRef.current;
+        const track = currentTrackRef.current;
+
+        if (!currentUser || !track || !currentAudio) return;
+
+        // Increment time and update user ref without causing a re-render
+        const newTotalMinutes = (currentUser.totalListeningMinutes || 0) + (5 / 60);
+        const updatedUserForStorage = { ...currentUser, totalListeningMinutes: newTotalMinutes };
+        userRef.current = updatedUserForStorage;
+        localStorage.setItem('joysicUser', JSON.stringify(updatedUserForStorage));
+        
+        // Sync with backend
         const playerState = {
-            trackId: currentTrack.id,
-            currentTime: audioRef.current?.currentTime || 0,
+            trackId: track.id,
+            currentTime: currentAudio.currentTime,
             totalListeningMinutes: newTotalMinutes,
         };
         
-        updateUserPlayerState(user.id, playerState).catch(err => {
+        updateUserPlayerState(currentUser.id, playerState).catch(err => {
             console.error("Failed to update player state:", err);
         });
 
-        const updatedUser = { ...user, totalListeningMinutes: newTotalMinutes };
-        setUser(updatedUser);
-        localStorage.setItem('joysicUser', JSON.stringify(updatedUser));
       }, 5000);
     }
     
@@ -111,15 +130,18 @@ const App: React.FC = () => {
         clearInterval(playerStateUpdateInterval.current);
       }
     };
-  }, [isPlaying, user, currentTrack]);
+  }, [isPlaying]);
 
   const syncPlayerState = useCallback(async () => {
       if (!user || tracks.length === 0) return;
       
       try {
         const latestUserData = await fetchUserById(user.id);
-        setUser(currentUser => ({...currentUser, ...latestUserData}));
-        localStorage.setItem('joysicUser', JSON.stringify(latestUserData));
+        const currentUserData = userRef.current;
+        
+        const mergedUser = {...currentUserData, ...latestUserData};
+        setUser(mergedUser);
+        localStorage.setItem('joysicUser', JSON.stringify(mergedUser));
         
         const { lastPlayerState } = latestUserData;
 
@@ -141,7 +163,7 @@ const App: React.FC = () => {
       } catch (err) {
           console.error("Failed to sync player state:", err);
       }
-  }, [user, tracks, currentTrack?.id]);
+  }, [user?.id, tracks, currentTrack?.id]);
 
   useEffect(() => {
       if (user && tracks.length > 0) {
@@ -157,7 +179,7 @@ const App: React.FC = () => {
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
       }
-  }, [user, tracks.length, syncPlayerState]);
+  }, [user?.id, tracks.length, syncPlayerState]);
 
 
   const loadAppData = useCallback(async (currentUser: User) => {
@@ -410,7 +432,7 @@ const App: React.FC = () => {
     if (audioRef.current) audioRef.current.currentTime = newTime;
   };
 
-  const handleSelectArtist = async (artistId: string) => {
+  const handleSelectArtist = useCallback(async (artistId: string) => {
     setIsArtistLoading(true);
     setView('artist');
     setIsPlayerExpanded(false);
@@ -428,7 +450,7 @@ const App: React.FC = () => {
     } finally {
       setIsArtistLoading(false);
     }
-  };
+  }, [tracks]);
 
   const handlePlayTrack = useCallback((trackId: string, trackList: Track[]) => {
     const newIndex = trackList.findIndex(t => t.id === trackId);
@@ -489,7 +511,7 @@ const App: React.FC = () => {
     }
   }, [scannedTrackId, tracks, handlePlayTrack]);
 
-  const handleSelectPlaylist = (playlist: Playlist) => {
+  const handleSelectPlaylist = useCallback((playlist: Playlist) => {
     // Ensure playlist tracks have the latest stats
     const updatedPlaylist = {
       ...playlist,
@@ -497,7 +519,7 @@ const App: React.FC = () => {
     };
     setSelectedPlaylist(updatedPlaylist);
     setView('playlistDetail');
-  }
+  }, [tracks]);
 
   const handleShufflePlayAll = () => {
     if (tracks.length === 0) return;
@@ -506,6 +528,9 @@ const App: React.FC = () => {
     setCurrentTrackIndex(0);
     setIsPlaying(true);
   };
+
+  const handleNavigateToProfile = useCallback(() => setView('profile'), []);
+  const handleOpenScanner = useCallback(() => setIsScannerOpen(true), []);
 
   const handleExpandPlayer = () => setIsPlayerExpanded(true);
   const handleMinimizePlayer = () => setIsPlayerExpanded(false);
@@ -573,8 +598,8 @@ const App: React.FC = () => {
                 onSelectArtist={handleSelectArtist}
                 onPlayTrack={(trackId) => handlePlayTrack(trackId, tracks)}
                 onShufflePlayAll={handleShufflePlayAll} 
-                onNavigateToProfile={() => setView('profile')} 
-                onOpenScanner={() => setIsScannerOpen(true)}
+                onNavigateToProfile={handleNavigateToProfile}
+                onOpenScanner={handleOpenScanner}
                 currentTrackId={currentTrack?.id}
                 isPlaying={isPlaying}
             />;

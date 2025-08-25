@@ -9,7 +9,7 @@ const PHOTOS_TABLE_NAME = 'Фото';
 const AIRTABLE_API_KEY = 'patZi9FoyhVvaJGnt.fdefebefbc59c7f41ff1bbf09d80f9a2da8f35dcc24c98e9766dba336053487d';
 
 const fetchFromAirtable = async (tableName: string, options: RequestInit = {}, path: string = '') => {
-  const API_URL = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${tableName}${path}`;
+  const API_URL = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(tableName)}${path}`;
   const response = await fetch(API_URL, {
     ...options,
     headers: {
