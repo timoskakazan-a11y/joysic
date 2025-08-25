@@ -46,7 +46,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, stats, onBack, onLogout
 
     return (
         <div className="min-h-screen bg-background text-text font-sans p-4 sm:p-6 animate-fadeInScaleUp">
-             <header className="relative flex justify-center items-center mb-8">
+             <header className="relative flex justify-center items-center mb-8 max-w-md md:max-w-2xl lg:max-w-3xl mx-auto">
                 <button 
                     onClick={onBack} 
                     className="absolute left-0 bg-surface text-primary rounded-full h-10 w-10 flex items-center justify-center hover:bg-surface-light transition-colors"
@@ -57,7 +57,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, stats, onBack, onLogout
                 <h1 className="text-2xl font-bold text-primary">Профиль</h1>
             </header>
             
-            <main className="max-w-md mx-auto">
+            <main className="max-w-md md:max-w-2xl lg:max-w-3xl mx-auto">
                 <div className="flex flex-col items-center mb-8">
                     <div className="relative w-32 h-32 rounded-full mb-4 shadow-lg">
                          <img 
@@ -69,31 +69,31 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, stats, onBack, onLogout
                     <h2 className="text-3xl font-black text-primary">{user.name}</h2>
                 </div>
 
-                {/* Stats Card */}
-                <div className="bg-surface rounded-2xl shadow-lg overflow-hidden flex items-center">
+                {/* Time Card with GIF */}
+                <div className="bg-surface rounded-2xl shadow-lg p-4 sm:p-6 flex items-center gap-4 sm:gap-6 mb-6">
+                    {/* Left side: GIF */}
                     {monkeyImageUrl && (
-                        <div className="w-2/5 flex-shrink-0">
-                            <div className="relative aspect-square">
-                                <img
-                                    src={monkeyImageUrl}
-                                    alt="Decorative animation"
-                                    className="absolute inset-0 w-full h-full object-cover"
-                                />
-                            </div>
+                        <div className="w-20 h-20 sm:w-28 sm:h-28 flex-shrink-0 rounded-2xl overflow-hidden bg-surface-light">
+                            <img
+                                src={monkeyImageUrl}
+                                alt="Decorative animation"
+                                className="w-full h-full object-cover"
+                            />
                         </div>
                     )}
-                    <div className="p-4 sm:p-6 flex-grow">
-                        <h3 className="font-bold text-primary text-lg mb-2">Время в Joysic</h3>
-                        <div className="flex items-baseline gap-1 sm:gap-2">
-                            <span className="text-4xl sm:text-5xl font-black text-accent">{hours}</span>
-                            <span className="text-lg text-text-secondary">ч</span>
-                            <span className="text-4xl sm:text-5xl font-black text-accent sm:ml-2">{minutes}</span>
-                            <span className="text-lg text-text-secondary">м</span>
+                    
+                    {/* Right side: Stats */}
+                    <div className="text-left flex-grow">
+                        <h3 className="font-bold text-primary text-base sm:text-lg mb-1 sm:mb-2">Время в Joysic</h3>
+                        <div className="flex items-baseline justify-start gap-1 sm:gap-2">
+                            <span className="text-3xl sm:text-5xl font-black text-accent">{hours}</span>
+                            <span className="text-base sm:text-lg text-text-secondary">ч</span>
+                            <span className="text-3xl sm:text-5xl font-black text-accent sm:ml-2">{minutes}</span>
+                            <span className="text-base sm:text-lg text-text-secondary">м</span>
                         </div>
                         <p className="text-xs sm:text-sm text-text-secondary mt-1">общее время прослушивания</p>
                     </div>
                 </div>
-
 
                 <div className="bg-surface rounded-2xl shadow-lg p-6 mt-6">
                     <h3 className="font-bold text-primary text-lg mb-4">Статистика медиатеки</h3>

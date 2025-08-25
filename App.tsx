@@ -1,6 +1,7 @@
 
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { fetchTracks, fetchArtistDetails, loginUser, registerUser, updateUserLikes, fetchPlaylistsForUser, incrementTrackStats, fetchBetaImage, fetchSimpleArtistsByIds, updateUserPlayerState, fetchUserById } from './services/airtableService';
+import { fetchTracks, fetchArtistDetails, loginUser, registerUser, updateUserLikes, fetchPlaylistsForUser, incrementTrackStats, fetchBetaImage, fetchSimpleArtistsByIds, fetchUserById, updateUserPlayerState } from './services/airtableService';
 import type { Track, Artist, User, Playlist, SimpleArtist } from './types';
 import Player from './components/Player';
 import ArtistPage from './components/ArtistPage';
@@ -51,7 +52,7 @@ const App: React.FC = () => {
   const [scannedTrackId, setScannedTrackId] = useState<string | null>(null);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const playerStateUpdateInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+  const playerSyncInterval = useRef<ReturnType<typeof setInterval> | null>(null);
   
   const currentTrack = currentTrackIndex !== null && shuffledTracks.length > 0 ? shuffledTracks[currentTrackIndex] : null;
 
@@ -83,103 +84,67 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (isCheckingBeta || isBetaLocked) return;
-    const savedUser = localStorage.getItem('joysicUser');
-    if (savedUser) {
-      const parsedUser = JSON.parse(savedUser);
-      setUser(parsedUser);
-    }
-    setIsAuthLoading(false);
+
+    const authenticateAndSyncUser = async () => {
+      const savedUserString = localStorage.getItem('joysicUser');
+      if (savedUserString) {
+        let userToSet: User | null = null;
+        try {
+          userToSet = JSON.parse(savedUserString); // Parse once
+          // Prioritize fetching the latest state from the server.
+          const latestUser = await fetchUserById(userToSet.id);
+          userToSet = latestUser; // If fetch succeeds, update the user to set
+          localStorage.setItem('joysicUser', JSON.stringify(latestUser));
+        } catch (error) {
+          console.error("Failed to sync user state, using local data as fallback.", error);
+          // If fetch fails, userToSet remains the parsed local user, which is what we want.
+        }
+        setUser(userToSet);
+      }
+      setIsAuthLoading(false);
+    };
+
+    authenticateAndSyncUser();
   }, [isCheckingBeta, isBetaLocked]);
   
   // Effect for tracking and synchronizing player state in the background
   useEffect(() => {
-    if (playerStateUpdateInterval.current) {
-      clearInterval(playerStateUpdateInterval.current);
+    if (playerSyncInterval.current) {
+      clearInterval(playerSyncInterval.current);
     }
 
     if (isPlaying) {
-      playerStateUpdateInterval.current = setInterval(() => {
+      playerSyncInterval.current = setInterval(() => {
         const currentUser = userRef.current;
-        const currentAudio = audioRef.current;
         const track = currentTrackRef.current;
+        const audio = audioRef.current;
 
-        if (!currentUser || !track || !currentAudio) return;
+        if (!currentUser || !track || !audio) return;
 
         // Increment time and update user ref without causing a re-render
         const newTotalMinutes = (currentUser.totalListeningMinutes || 0) + (5 / 60);
-        const updatedUserForStorage = { ...currentUser, totalListeningMinutes: newTotalMinutes };
+        const updatedUserForStorage: User = { ...currentUser, totalListeningMinutes: newTotalMinutes };
         userRef.current = updatedUserForStorage;
         localStorage.setItem('joysicUser', JSON.stringify(updatedUserForStorage));
         
-        // Sync with backend
-        const playerState = {
-            trackId: track.id,
-            currentTime: currentAudio.currentTime,
-            totalListeningMinutes: newTotalMinutes,
-        };
-        
-        updateUserPlayerState(currentUser.id, playerState).catch(err => {
-            console.error("Failed to update player state:", err);
+        updateUserPlayerState(
+            currentUser.id,
+            track.id,
+            audio.currentTime,
+            newTotalMinutes
+        ).catch(err => {
+            console.error("Failed to sync player state:", err);
         });
 
       }, 5000);
     }
     
     return () => {
-      if (playerStateUpdateInterval.current) {
-        clearInterval(playerStateUpdateInterval.current);
+      if (playerSyncInterval.current) {
+        clearInterval(playerSyncInterval.current);
       }
     };
   }, [isPlaying]);
-
-  const syncPlayerState = useCallback(async () => {
-      if (!user || tracks.length === 0) return;
-      
-      try {
-        const latestUserData = await fetchUserById(user.id);
-        const currentUserData = userRef.current;
-        
-        const mergedUser = {...currentUserData, ...latestUserData};
-        setUser(mergedUser);
-        localStorage.setItem('joysicUser', JSON.stringify(mergedUser));
-        
-        const { lastPlayerState } = latestUserData;
-
-        if (lastPlayerState && lastPlayerState.trackId) {
-            const isRecent = (Date.now() - lastPlayerState.timestamp) < 10 * 60 * 1000; // 10 minutes
-            const isDifferentTrack = currentTrack?.id !== lastPlayerState.trackId;
-            const isSignificantTimeDiff = Math.abs((audioRef.current?.currentTime || 0) - lastPlayerState.currentTime) > 10;
-            
-            if (isRecent && (isDifferentTrack || isSignificantTimeDiff)) {
-                const trackToSync = tracks.find(t => t.id === lastPlayerState.trackId);
-                if (trackToSync) {
-                    setShuffledTracks([trackToSync, ...tracks.filter(t => t.id !== lastPlayerState.trackId)]);
-                    setCurrentTrackIndex(0);
-                    setIsPlaying(false);
-                    setInitialSeekTime(lastPlayerState.currentTime);
-                }
-            }
-        }
-      } catch (err) {
-          console.error("Failed to sync player state:", err);
-      }
-  }, [user?.id, tracks, currentTrack?.id]);
-
-  useEffect(() => {
-      if (user && tracks.length > 0) {
-        syncPlayerState();
-        
-        const handleVisibilityChange = () => {
-            if (document.visibilityState === 'visible') {
-                syncPlayerState();
-            }
-        };
-        document.addEventListener('visibilitychange', handleVisibilityChange);
-        return () => {
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
-        };
-      }
-  }, [user?.id, tracks.length, syncPlayerState]);
 
 
   const loadAppData = useCallback(async (currentUser: User) => {
@@ -224,6 +189,19 @@ const App: React.FC = () => {
     }
   }, [user, tracks.length, loadAppData]);
 
+  // Effect to handle setting initial track after user and tracks are loaded from sync
+  useEffect(() => {
+    if (user?.lastPlayedTrackId && tracks.length > 0 && currentTrackIndex === null) {
+        const lastTrack = tracks.find(t => t.id === user.lastPlayedTrackId);
+        if (lastTrack) {
+            setShuffledTracks([lastTrack]);
+            setCurrentTrackIndex(0);
+            setIsPlaying(false);
+            setInitialSeekTime(user.lastPlayedSecond || 0);
+        }
+    }
+  }, [user, tracks, currentTrackIndex]);
+
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -234,32 +212,27 @@ const App: React.FC = () => {
         audio.load();
       }
       
-      const playPromise = isPlaying ? audio.play() : Promise.resolve();
-      playPromise.catch(error => {
-        if (error.name !== 'AbortError') {
-          console.error("Audio playback error:", error);
-          setIsPlaying(false);
+      if (isPlaying) {
+        const playPromise = audio.play();
+        if (playPromise !== undefined) {
+            playPromise.catch(error => {
+                if (error.name !== 'AbortError') {
+                    console.error("Audio playback error:", error);
+                    setIsPlaying(false);
+                }
+            });
         }
-      });
+      } else {
+        if (!audio.paused) {
+          audio.pause();
+        }
+      }
       
     } else {
         audio.pause();
         audio.src = '';
     }
   }, [currentTrack, isPlaying]);
-  
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (audio && initialSeekTime !== null) {
-      const onMetadataLoaded = () => {
-        audio.currentTime = initialSeekTime;
-        setProgress(p => ({ ...p, currentTime: initialSeekTime }));
-        setInitialSeekTime(null);
-      };
-      audio.addEventListener('loadedmetadata', onMetadataLoaded, { once: true });
-      return () => audio.removeEventListener('loadedmetadata', onMetadataLoaded);
-    }
-  }, [initialSeekTime]);
 
   const handleLogin = async (email: string, pass: string) => {
     const loggedInUser = await loginUser(email, pass);
@@ -426,6 +399,14 @@ const App: React.FC = () => {
   
   const handleTimeUpdate = () => {
     if (audioRef.current) setProgress({ currentTime: audioRef.current.currentTime, duration: audioRef.current.duration || 0 });
+  };
+
+  const handleLoadedData = () => {
+    handleTimeUpdate();
+    if (initialSeekTime !== null && audioRef.current) {
+        audioRef.current.currentTime = initialSeekTime;
+        setInitialSeekTime(null);
+    }
   };
   
   const handleSeek = (newTime: number) => {
@@ -637,7 +618,7 @@ const App: React.FC = () => {
       
       {isScannerOpen && <ScannerModal onClose={() => setIsScannerOpen(false)} onScanSuccess={handleScanSuccess} />}
 
-      <audio ref={audioRef} onTimeUpdate={handleTimeUpdate} onLoadedData={handleTimeUpdate} onEnded={handleNextTrack} className="hidden"/>
+      <audio ref={audioRef} onTimeUpdate={handleTimeUpdate} onLoadedData={handleLoadedData} onEnded={handleNextTrack} className="hidden"/>
     </div>
   );
 };

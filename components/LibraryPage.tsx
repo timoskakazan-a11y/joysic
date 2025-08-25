@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import type { User, Playlist, SimpleArtist, Track } from '../types';
 import { ShuffleIcon, SearchIcon, QrCodeIcon, SoundWaveIcon } from './IconComponents';
 import TrackCover from './TrackCover';
@@ -36,16 +36,23 @@ const PlaylistCard = React.memo<{ playlist: Playlist; onSelect: () => void }>(({
   </div>
 ));
 
-const ArtistCard = React.memo<{ artist: SimpleArtist; onSelect: () => void }>(({ artist, onSelect }) => (
-  <div onClick={onSelect} className="group cursor-pointer flex-shrink-0 w-32 sm:w-36 text-center">
-    <div className="relative aspect-square w-full rounded-full shadow-lg overflow-hidden bg-surface transition-transform duration-300 group-hover:scale-105">
-      <img src={artist.photoUrl || 'https://i.postimg.cc/G3K2BYkT/joysic.png'} alt={artist.name} className="w-full h-full object-cover" />
+const ArtistCard = React.memo<{ artist: SimpleArtist; onSelect: (id: string) => void }>(({ artist, onSelect }) => {
+  const handleSelect = useCallback(() => {
+    onSelect(artist.id);
+  }, [onSelect, artist.id]);
+
+  return (
+    <div onClick={handleSelect} className="group cursor-pointer flex-shrink-0 w-32 sm:w-36 md:w-40 text-center">
+      <div className="relative aspect-square w-full rounded-full shadow-lg overflow-hidden bg-surface transition-transform duration-300 group-hover:scale-105">
+        <img src={artist.photoUrl || 'https://i.postimg.cc/G3K2BYkT/joysic.png'} alt={artist.name} className="w-full h-full object-cover" />
+      </div>
+      <div className="mt-3">
+        <h3 className="font-bold text-primary truncate">{artist.name}</h3>
+      </div>
     </div>
-    <div className="mt-3">
-      <h3 className="font-bold text-primary truncate">{artist.name}</h3>
-    </div>
-  </div>
-));
+  );
+});
+
 
 const SearchResultTrack = React.memo<{track: Track, isActive: boolean, isPlaying: boolean, onPlay: () => void}>(({ track, isActive, isPlaying, onPlay }) => {
     return (
@@ -117,7 +124,7 @@ const LibraryPage: React.FC<LibraryPageProps> = ({ user, playlists, likedAlbums,
               <h2 className="text-2xl font-bold text-primary mb-4">Исполнители</h2>
               <div className="flex gap-6 overflow-x-auto pb-4 -mx-4 sm:-mx-6 px-4 sm:px-6">
                 {filteredArtists.map(artist => (
-                  <ArtistCard key={artist.id} artist={artist} onSelect={() => onSelectArtist(artist.id)} />
+                  <ArtistCard key={artist.id} artist={artist} onSelect={onSelectArtist} />
                 ))}
               </div>
             </div>
@@ -180,10 +187,10 @@ const LibraryPage: React.FC<LibraryPageProps> = ({ user, playlists, likedAlbums,
 
           {likedArtists.length > 0 && (
             <div className="mt-12">
-              <h2 className="text-3xl sm:text-4xl font-black text-primary mb-8">Любимые исполнители</h2>
+              <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-primary mb-8">Любимые исполнители</h2>
               <div className="flex gap-6 overflow-x-auto pb-4 -mx-4 sm:-mx-6 px-4 sm:px-6">
                 {likedArtists.map(artist => (
-                  <ArtistCard key={artist.id} artist={artist} onSelect={() => onSelectArtist(artist.id)} />
+                  <ArtistCard key={artist.id} artist={artist} onSelect={onSelectArtist} />
                 ))}
               </div>
             </div>
@@ -191,7 +198,7 @@ const LibraryPage: React.FC<LibraryPageProps> = ({ user, playlists, likedAlbums,
 
           {likedAlbums.length > 0 && (
             <div className="mt-12">
-              <h2 className="text-3xl sm:text-4xl font-black text-primary mb-8">Лайкнутые альбомы</h2>
+              <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-primary mb-8">Лайкнутые альбомы</h2>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
                 {likedAlbums.map(album => (
                   <PlaylistCard key={album.id} playlist={album} onSelect={() => onSelectPlaylist(album)} />
