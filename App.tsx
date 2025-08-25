@@ -46,6 +46,7 @@ const App: React.FC = () => {
   const [isArtistLoading, setIsArtistLoading] = useState<boolean>(false);
   const [isPlayerExpanded, setIsPlayerExpanded] = useState<boolean>(false);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [scannedTrackId, setScannedTrackId] = useState<string | null>(null);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const currentTrack = currentTrackIndex !== null && shuffledTracks.length > 0 ? shuffledTracks[currentTrackIndex] : null;
@@ -332,7 +333,7 @@ const App: React.FC = () => {
     }
   };
 
-  const handlePlayTrack = (trackId: string, trackList: Track[]) => {
+  const handlePlayTrack = useCallback((trackId: string, trackList: Track[]) => {
     const newIndex = trackList.findIndex(t => t.id === trackId);
     if (newIndex !== -1) {
       const newShuffledList = [...trackList];
@@ -371,19 +372,25 @@ const App: React.FC = () => {
       }
     }
     setIsPlayerExpanded(false);
-  };
+  }, [currentTrack, handlePlayPause, tracks]);
   
-  const handlePlayTrackById = (trackId: string) => {
+  const handleScanSuccess = useCallback((trackId: string) => {
+    setScannedTrackId(trackId);
     setIsScannerOpen(false);
-    const trackExists = tracks.some(t => t.id === trackId);
-    if (trackExists) {
-      handlePlayTrack(trackId, tracks);
-      setIsPlayerExpanded(true);
-    } else {
-      console.warn(`Track with ID ${trackId} not found from scan.`);
-      // Optionally, show a user-facing error here
+  }, []);
+
+  useEffect(() => {
+    if (scannedTrackId) {
+      const trackExists = tracks.some(t => t.id === scannedTrackId);
+      if (trackExists) {
+        handlePlayTrack(scannedTrackId, tracks);
+        setIsPlayerExpanded(true);
+      } else {
+        console.warn(`Track with ID ${scannedTrackId} not found from scan.`);
+      }
+      setScannedTrackId(null); // Reset after handling
     }
-  };
+  }, [scannedTrackId, tracks, handlePlayTrack]);
 
   const handleSelectPlaylist = (playlist: Playlist) => {
     // Ensure playlist tracks have the latest stats
@@ -495,7 +502,7 @@ const App: React.FC = () => {
         </>
       )}
       
-      {isScannerOpen && <ScannerModal onClose={() => setIsScannerOpen(false)} onScanSuccess={handlePlayTrackById} />}
+      {isScannerOpen && <ScannerModal onClose={() => setIsScannerOpen(false)} onScanSuccess={handleScanSuccess} />}
 
       <audio ref={audioRef} onTimeUpdate={handleTimeUpdate} onLoadedData={handleTimeUpdate} onEnded={handleNextTrack} className="hidden"/>
     </div>

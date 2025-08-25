@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { CloseIcon } from './IconComponents';
 
+// Make the global variable available for TypeScript
 declare const Html5Qrcode: any;
-declare const Html5QrcodeSupportedFormats: any;
 
 interface ScannerModalProps {
   onClose: () => void;
@@ -10,76 +10,94 @@ interface ScannerModalProps {
 }
 
 const ScannerModal: React.FC<ScannerModalProps> = ({ onClose, onScanSuccess }) => {
-    const scannerRef = useRef<HTMLDivElement>(null);
-    const html5QrCodeRef = useRef<any>(null);
+    // A ref to the DOM element that will contain the camera view.
+    const scannerContainerRef = useRef<HTMLDivElement>(null);
+    // A ref to hold the scanner library instance. This is key to avoiding re-initialization.
+    const scannerInstanceRef = useRef<any>(null);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        if (scannerRef.current && typeof Html5Qrcode !== 'undefined') {
-            const html5QrCode = new Html5Qrcode(scannerRef.current.id, { formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE] });
-            html5QrCodeRef.current = html5QrCode;
+        // This effect manages the entire lifecycle of the scanner.
+        // It runs only once when the component mounts.
 
-            const config = {
-                fps: 10,
-                qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
-                    const edge = Math.min(viewfinderWidth, viewfinderHeight);
-                    const size = edge * 0.8; 
-                    return {
-                        width: size,
-                        height: size
-                    };
-                },
-                aspectRatio: 1.0,
-            };
-
-            const successCallback = (decodedText: string, decodedResult: any) => {
-                if (html5QrCodeRef.current?.isScanning) {
-                    html5QrCodeRef.current.stop();
-                }
-                onScanSuccess(decodedText);
-            };
-
-            const errorCallback = (errorMessage: string) => {
-                // handle scan failure, usually ignore
-            };
-
-            const startScanner = async () => {
-                try {
-                    await html5QrCode.start(
-                        { facingMode: "environment" },
-                        config,
-                        successCallback,
-                        errorCallback
-                    );
-                } catch (err: any) {
-                    console.error("Camera Error:", err);
-                    setError("Не удалось получить доступ к камере. Проверьте разрешения в настройках браузера.");
-                }
-            };
-
-            startScanner();
-
-            return () => {
-                if (html5QrCodeRef.current && html5QrCodeRef.current.isScanning) {
-                    html5QrCodeRef.current.stop().catch((err: any) => console.error("Failed to stop scanner:", err));
-                }
-            };
+        if (!scannerContainerRef.current) {
+            console.error("Scanner container ref is not available.");
+            return;
         }
-    }, [onScanSuccess]);
+
+        // We will assign the instance to our ref.
+        scannerInstanceRef.current = new Html5Qrcode(scannerContainerRef.current.id);
+        const scanner = scannerInstanceRef.current;
+
+        const successCallback = (decodedText: string) => {
+            // Ensure we don't process scans after starting to tear down.
+            if (scanner && scanner.isScanning) {
+                // Stop the scanner immediately on a successful scan.
+                scanner.stop()
+                    .then(() => {
+                        console.log("Scanner stopped on success.");
+                        // Only after stopping, call the success handler.
+                        onScanSuccess(decodedText);
+                    })
+                    .catch((err: any) => {
+                        console.error("Failed to stop scanner after success.", err);
+                        // Still call the handler to ensure functionality.
+                        onScanSuccess(decodedText);
+                    });
+            }
+        };
+
+        const errorCallback = (errorMessage: string) => {
+            // The library calls this frequently. It's safe to ignore.
+        };
+        
+        const config = {
+            fps: 10,
+            qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
+                const size = Math.min(viewfinderWidth, viewfinderHeight) * 0.8;
+                return { width: size, height: size };
+            },
+        };
+
+        // Start the camera and scanner.
+        scanner.start(
+            { facingMode: "environment" }, // Use the rear camera
+            config,
+            successCallback,
+            errorCallback
+        ).catch((err: any) => {
+            console.error("Unable to start scanning.", err);
+            setError("Не удалось получить доступ к камере. Проверьте разрешения.");
+        });
+
+        // The cleanup function is critical. It runs when the component unmounts.
+        return () => {
+            const instance = scannerInstanceRef.current;
+            if (instance && instance.isScanning) {
+                instance.stop()
+                    .then(() => console.log("Scanner stopped on cleanup."))
+                    .catch((err: any) => console.error("Failed to stop scanner on cleanup.", err));
+            }
+        };
+    }, []); // The empty dependency array is crucial. It ensures this runs only once.
+             // We rely on the `onScanSuccess` prop being stable from the parent (`useCallback`).
 
     return (
         <div 
             className="fixed inset-0 bg-black z-[100] flex items-center justify-center animate-fadeInScaleUp"
         >
-            <div id="qr-reader" ref={scannerRef} className="absolute inset-0 [&>video]:w-full [&>video]:h-full [&>video]:object-cover"></div>
-            {error && <div className="absolute inset-0 bg-black flex items-center justify-center p-4 text-center text-red-300">{error}</div>}
+            <div id="joysic-qr-reader" ref={scannerContainerRef} className="absolute inset-0 [&>video]:w-full [&>video]:h-full [&>video]:object-cover"></div>
             
-            {/* Viewfinder overlay */}
+            {error && (
+                <div className="absolute inset-0 bg-black flex items-center justify-center p-4 text-center text-red-300 z-10">
+                    <p>{error}</p>
+                </div>
+            )}
+            
+            {/* Viewfinder UI */}
             <div className="absolute inset-0 pointer-events-none flex items-center justify-center" aria-hidden="true">
                 <div className="w-[80vw] h-[80vw] max-w-sm max-h-sm relative">
                     <div className="absolute inset-0 shadow-[0_0_0_9999px_rgba(0,0,0,0.7)]"></div>
-
-                    {/* Corner borders - simplified and rounded */}
                     <div className="absolute -top-1 -left-1 w-12 h-12 border-t-4 border-l-4 border-white/90 rounded-tl-2xl"></div>
                     <div className="absolute -top-1 -right-1 w-12 h-12 border-t-4 border-r-4 border-white/90 rounded-tr-2xl"></div>
                     <div className="absolute -bottom-1 -left-1 w-12 h-12 border-b-4 border-l-4 border-white/90 rounded-bl-2xl"></div>
