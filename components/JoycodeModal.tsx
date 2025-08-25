@@ -1,6 +1,7 @@
 import React from 'react';
 import type { Track } from '../types';
 import Barcode from './Barcode';
+import { CloseIcon } from './IconComponents';
 
 interface JoycodeModalProps {
   track: Track;
@@ -28,6 +29,14 @@ const JoycodeModal: React.FC<JoycodeModalProps> = ({ track, onClose }) => {
         className="relative bg-white/10 backdrop-blur-xl rounded-3xl shadow-2xl w-full max-w-sm text-center border border-white/10 overflow-hidden"
         onClick={e => e.stopPropagation()}
       >
+        <button 
+          onClick={onClose}
+          className="absolute top-4 right-4 text-white/50 hover:text-white transition-colors z-10 p-1"
+          aria-label="Close"
+        >
+          <CloseIcon className="w-6 h-6" />
+        </button>
+
         <div className="p-8 flex flex-col items-center gap-6">
             <img 
               src={track.coverUrl} 
@@ -47,6 +56,10 @@ const JoycodeModal: React.FC<JoycodeModalProps> = ({ track, onClose }) => {
             </div>
         </div>
       </div>
+
+      <p className="absolute bottom-6 left-0 right-0 text-center text-white/70 text-sm pointer-events-none px-4">
+        Отсканируйте с другого устройства, чтобы поделиться
+      </p>
     </div>
   );
 };
