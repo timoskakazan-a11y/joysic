@@ -519,3 +519,36 @@ export const fetchSimpleArtistsByIds = async (artistIds: string[]): Promise<Simp
     const artistRecords: AirtableArtistRecord[] = response.records || [];
     return artistRecords.map(mapAirtableRecordToSimpleArtist);
 };
+
+export const fetchAllArtists = async (): Promise<SimpleArtist[]> => {
+    const response = await fetchFromAirtable(ARTISTS_TABLE_NAME, {}, '?fields%5B%5D=Имя&fields%5B%5D=Фото');
+    const artistRecords: AirtableArtistRecord[] = response.records || [];
+    return artistRecords.map(mapAirtableRecordToSimpleArtist);
+};
+
+export const createTrack = async (trackData: {
+    title: string;
+    artistId: string;
+    audioUrl: string;
+    coverUrl: string;
+    mat: boolean;
+}): Promise<void> => {
+    await fetchFromAirtable(MUSIC_TABLE_NAME, {
+        method: 'POST',
+        body: JSON.stringify({
+            records: [
+                {
+                    fields: {
+                        'Название': trackData.title,
+                        'Исполнитель': [trackData.artistId],
+                        'Аудио': [{ url: trackData.audioUrl }],
+                        'Обложка трека': [{ url: trackData.coverUrl }],
+                        'МАТ': trackData.mat,
+                        'Лайки': 0,
+                        'Прослушивания': 0,
+                    },
+                },
+            ],
+        }),
+    });
+};
