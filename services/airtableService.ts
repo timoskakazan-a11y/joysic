@@ -36,7 +36,7 @@ const mapAirtableRecordToUser = (record: AirtableUserRecord): User => {
         likedArtistIds: record.fields['Любимые исполнители'] || [],
         favoriteCollectionIds: record.fields['Любимый плейлист'] || [],
         avatarUrl: record.fields['Аватар']?.[0]?.url,
-        totalListeningMinutes: record.fields['Общее время прослушивания'] || 0,
+        totalListeningMinutes: parseInt(record.fields['Время прослушивания'] || '0', 10) || 0,
     };
 };
 
@@ -232,7 +232,7 @@ export const updateUserListeningTime = async (userId: string, totalMinutes: numb
       records: [{
         id: userId,
         fields: {
-          'Общее время прослушивания': totalMinutes
+          'Время прослушивания': String(totalMinutes)
         }
       }]
     })

@@ -122,7 +122,7 @@ export interface AirtableUserRecord {
         'Любимые исполнители'?: string[];
         'Любимый плейлист'?: string[];
         'Аватар'?: AirtableAttachment[];
-        'Общее время прослушивания'?: number;
+        'Время прослушивания'?: string;
     }
 }
 
