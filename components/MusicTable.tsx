@@ -56,7 +56,7 @@ const MusicTable: React.FC<MusicTableProps> = ({ tracks, currentTrackId, isPlayi
                     <img src={track.coverUrl} alt={track.title} className="w-10 h-10 rounded-md object-cover"/>
                     <span>{track.title}</span>
                 </div>
-                <div className="col-span-3 text-slate-300 truncate">{track.artist}</div>
+                <div className="col-span-3 text-slate-300 truncate">{track.artists.map(a => a.name).join(', ')}</div>
                 <div className="col-span-4 text-slate-400 truncate">{track.lyrics.substring(0, 50)}{track.lyrics.length > 50 ? '...' : ''}</div>
               </div>
             );

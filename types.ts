@@ -8,8 +8,7 @@ export interface Artwork {
 export interface Track {
   id: string;
   title: string;
-  artist: string;
-  artistId: string;
+  artists: SimpleArtist[];
   lyrics: string;
   audioUrl: string;
   artwork: Artwork[];

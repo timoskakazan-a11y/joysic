@@ -129,7 +129,7 @@ const PlaylistDetailPage: React.FC<PlaylistDetailPageProps> = ({ playlist, onBac
                 <div className="flex-grow mx-4 flex justify-between items-start gap-4">
                     <div>
                         <p className={`font-semibold ${isActive ? 'text-accent' : 'text-text'}`}>{track.title}</p>
-                        <p className="text-sm text-text-secondary">{track.artist}</p>
+                        <p className="text-sm text-text-secondary">{track.artists.map(a => a.name).join(', ')}</p>
                     </div>
                     {track.mat && <div className="flex-shrink-0"><MatBadge onClick={onOpenMatInfo}/></div>}
                 </div>

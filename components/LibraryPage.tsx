@@ -68,7 +68,7 @@ const SearchResultTrack = React.memo<{track: Track, isActive: boolean, isPlaying
         <div className="flex-grow mx-4 flex justify-between items-start gap-4">
             <div>
                 <p className={`font-semibold ${isActive ? 'text-accent' : 'text-text'}`}>{track.title}</p>
-                <p className="text-sm text-text-secondary">{track.artist}</p>
+                <p className="text-sm text-text-secondary">{track.artists.map(a => a.name).join(', ')}</p>
             </div>
             {track.mat && <div className="flex-shrink-0"><MatBadge onClick={onOpenMatInfo} /></div>}
         </div>
@@ -99,7 +99,7 @@ const LibraryPage: React.FC<LibraryPageProps> = ({ user, playlists, likedAlbums,
       if (searchQuery.trim().length < 2) return [];
       return tracks.filter(t => 
           t.title.toLowerCase().includes(lowercasedQuery) ||
-          t.artist.toLowerCase().includes(lowercasedQuery)
+          t.artists.some(a => a.name.toLowerCase().includes(lowercasedQuery))
       );
   }, [tracks, lowercasedQuery, searchQuery]);
 

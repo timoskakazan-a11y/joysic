@@ -1,5 +1,4 @@
 
-
 import type { Track, Artist, AirtableTrackRecord, AirtableArtistRecord, User, AirtableUserRecord, Playlist, AirtablePlaylistRecord, Artwork, AirtableAttachment, SimpleArtist } from '../types';
 
 const AIRTABLE_BASE_ID = 'appuGObKAO57IqWRN';
@@ -244,15 +243,22 @@ export const updateUserListeningTime = async (userId: string, totalMinutes: numb
 };
 
 
-const mapAirtableRecordToTrack = (record: AirtableTrackRecord, artistMap: Map<string, string>): Track | null => {
+const mapAirtableRecordToTrack = (record: AirtableTrackRecord, artistMap: Map<string, SimpleArtist>): Track | null => {
     const fields = record.fields;
     const coverAttachment = fields['Обложка трека']?.[0];
+    const artistIds = fields['Исполнитель'] || [];
 
-    if (!fields['Название'] || !(fields['Аудио']?.[0]?.url) || !coverAttachment?.url || !(fields['Исполнитель']?.[0])) {
+    if (!fields['Название'] || !(fields['Аудио']?.[0]?.url) || !coverAttachment?.url || artistIds.length === 0) {
         return null;
     }
-    const artistId = fields['Исполнитель'][0];
-    const artistName = artistMap.get(artistId) || 'Unknown Artist';
+
+    const artists: SimpleArtist[] = artistIds
+        .map(id => artistMap.get(id))
+        .filter((artist): artist is SimpleArtist => !!artist);
+    
+    if (artists.length === 0) {
+        return null; // A track must have at least one valid artist
+    }
     
     const coverUrlType = coverAttachment.type || 'image/jpeg';
     
@@ -284,8 +290,7 @@ const mapAirtableRecordToTrack = (record: AirtableTrackRecord, artistMap: Map<st
     return { 
         id: record.id, 
         title: fields['Название'], 
-        artist: artistName, 
-        artistId: artistId, 
+        artists: artists,
         lyrics: fields['Слова'] || '', 
         audioUrl: fields['Аудио'][0].url, 
         artwork,
@@ -300,19 +305,17 @@ const mapAirtableRecordToTrack = (record: AirtableTrackRecord, artistMap: Map<st
 
 export const fetchTracks = async (): Promise<Track[]> => {
   const [artistsResponse, tracksResponse] = await Promise.all([
-    fetchFromAirtable(ARTISTS_TABLE_NAME, {}, ''),
-    fetchFromAirtable(MUSIC_TABLE_NAME, {}, '')
+    fetchFromAirtable(ARTISTS_TABLE_NAME),
+    fetchFromAirtable(MUSIC_TABLE_NAME)
   ]);
-  const artistsData: { records?: { id: string; fields: { 'Имя'?: string } }[] } = artistsResponse;
+  const artistRecords: AirtableArtistRecord[] = artistsResponse.records || [];
+
+  const artistMap = new Map<string, SimpleArtist>();
+  artistRecords.forEach(record => {
+      artistMap.set(record.id, mapAirtableRecordToSimpleArtist(record));
+  });
+
   const tracksData: { records?: AirtableTrackRecord[] } = tracksResponse;
-
-  const artistMap = new Map<string, string>();
-  if (artistsData.records) {
-    artistsData.records.forEach(record => {
-      if (record.fields['Имя']) artistMap.set(record.id, record.fields['Имя']);
-    });
-  }
-
   if (!tracksData.records) {
     return [];
   }
@@ -361,12 +364,11 @@ export const fetchArtistDetails = async (artistId: string): Promise<Artist> => {
         
         // We need a map of all artists to correctly assign artist names to tracks, especially for collaborations.
         const artistsResponse = await fetchFromAirtable(ARTISTS_TABLE_NAME);
-        const artistMap = new Map<string, string>();
-        if (artistsResponse.records) {
-            artistsResponse.records.forEach((record: any) => {
-              if (record.fields['Имя']) artistMap.set(record.id, record.fields['Имя']);
-            });
-        }
+        const allArtistRecords: AirtableArtistRecord[] = artistsResponse.records || [];
+        const artistMap = new Map<string, SimpleArtist>();
+        allArtistRecords.forEach(record => {
+            artistMap.set(record.id, mapAirtableRecordToSimpleArtist(record));
+        });
 
         allTracks = trackRecords
             .map(record => mapAirtableRecordToTrack(record, artistMap))

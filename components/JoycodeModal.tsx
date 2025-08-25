@@ -1,3 +1,4 @@
+
 import React from 'react';
 import type { Track } from '../types';
 import Barcode from './Barcode';
@@ -46,7 +47,7 @@ const JoycodeModal: React.FC<JoycodeModalProps> = ({ track, onClose }) => {
             
             <div className="w-full">
                 <h2 className="text-2xl font-bold text-primary truncate">{track.title}</h2>
-                <p className="text-text-secondary">{track.artist}</p>
+                <p className="text-text-secondary">{track.artists.map(a => a.name).join(', ')}</p>
             </div>
             
             <div className="bg-white p-4 rounded-2xl">

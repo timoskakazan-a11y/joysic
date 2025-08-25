@@ -37,7 +37,7 @@ const MiniPlayer: React.FC<MiniPlayerProps> = ({ track, isPlaying, progress, onP
               <p className="font-semibold text-primary truncate">{track.title}</p>
               {track.mat && <MatBadgeStatic className="flex-shrink-0"/>}
             </div>
-            <p className="text-sm text-text-secondary truncate">{track.artist}</p>
+            <p className="text-sm text-text-secondary truncate">{track.artists.map(a => a.name).join(', ')}</p>
         </div>
         <button
             onClick={handlePlayPauseClick}

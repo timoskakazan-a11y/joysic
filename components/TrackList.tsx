@@ -22,7 +22,7 @@ const TrackList: React.FC<TrackListProps> = ({ tracks, currentTrackId, isPlaying
             className={`flex items-center p-3 rounded-2xl cursor-pointer transition-all duration-300 ${
               isActive ? 'bg-primary-light/20 shadow-md' : 'hover:bg-surface'
             }`}
-            aria-label={`Play ${track.title} by ${track.artist}`}
+            aria-label={`Play ${track.title} by ${track.artists.map(a => a.name).join(', ')}`}
             role="button"
             tabIndex={0}
           >
@@ -33,7 +33,7 @@ const TrackList: React.FC<TrackListProps> = ({ tracks, currentTrackId, isPlaying
               <p className={`font-bold ${isActive ? 'text-primary' : 'text-text'}`}>
                 {track.title}
               </p>
-              <p className="text-sm text-text-secondary">{track.artist}</p>
+              <p className="text-sm text-text-secondary">{track.artists.map(a => a.name).join(', ')}</p>
             </div>
             {isActive && isPlaying && (
               <SoundWaveIcon isPlaying={isPlaying} className="w-6 h-6 text-primary" />

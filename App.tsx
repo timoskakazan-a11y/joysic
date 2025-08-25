@@ -361,7 +361,7 @@ const App: React.FC = () => {
     if (currentTrack) {
       mediaSession.metadata = new window.MediaMetadata({
         title: currentTrack.title,
-        artist: currentTrack.artist,
+        artist: currentTrack.artists.map(a => a.name).join(', '),
         album: 'Joysic',
         artwork: currentTrack.artwork,
       });

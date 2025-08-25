@@ -62,8 +62,8 @@ const Player: React.FC<PlayerProps> = ({ track, isPlaying, progress, onPlayPause
   };
   
   const handleArtistClick = () => {
-      if (track.artistId) {
-          onSelectArtist(track.artistId);
+      if (track.artists && track.artists.length > 0) {
+          onSelectArtist(track.artists[0].id);
       }
   };
 
@@ -139,7 +139,7 @@ const Player: React.FC<PlayerProps> = ({ track, isPlaying, progress, onPlayPause
                 {track.mat && <MatBadge onClick={onOpenMatInfo} />}
               </h1>
               <button onClick={handleArtistClick} className="text-lg sm:text-xl font-medium text-text-secondary hover:text-primary transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50 rounded-md">
-                {track.artist}
+                {track.artists.map(a => a.name).join(', ')}
               </button>
               {track.youtubeClipUrl && (
                 <a
