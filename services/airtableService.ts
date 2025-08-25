@@ -28,6 +28,19 @@ const fetchFromAirtable = async (tableName: string, options: RequestInit = {}, p
 };
 
 const mapAirtableRecordToUser = (record: AirtableUserRecord): User => {
+    const lastTrackId = record.fields['ID текущего трека'];
+    const lastTrackTime = record.fields['Время текущего трека'];
+    const lastUpdate = record.fields['Последнее обновление плеера'];
+    let lastPlayerState: User['lastPlayerState'] | undefined = undefined;
+
+    if (lastTrackId && typeof lastTrackTime === 'number' && typeof lastUpdate === 'number') {
+        lastPlayerState = {
+            trackId: lastTrackId,
+            currentTime: lastTrackTime,
+            timestamp: lastUpdate,
+        };
+    }
+
     return {
         id: record.id,
         email: record.fields['Почта'],
@@ -37,6 +50,7 @@ const mapAirtableRecordToUser = (record: AirtableUserRecord): User => {
         favoriteCollectionIds: record.fields['Любимый плейлист'] || [],
         avatarUrl: record.fields['Аватар']?.[0]?.url,
         totalListeningMinutes: parseInt(record.fields['Время прослушивания'] || '0', 10) || 0,
+        lastPlayerState,
     };
 };
 
@@ -63,6 +77,11 @@ export const loginUser = async (email: string, password: string): Promise<User> 
         throw new Error('Неверный email или пароль');
     }
     return mapAirtableRecordToUser(response.records[0]);
+};
+
+export const fetchUserById = async (userId: string): Promise<User> => {
+    const record = await fetchFromAirtable(USERS_TABLE_NAME, {}, `/${userId}`);
+    return mapAirtableRecordToUser(record);
 };
 
 export const registerUser = async (email: string, password: string, name: string): Promise<User> => {
@@ -237,6 +256,23 @@ export const updateUserListeningTime = async (userId: string, totalMinutes: numb
       }]
     })
   });
+};
+
+export const updateUserPlayerState = async (userId: string, state: { trackId: string, currentTime: number, totalListeningMinutes: number }): Promise<void> => {
+    await fetchFromAirtable(USERS_TABLE_NAME, {
+        method: 'PATCH',
+        body: JSON.stringify({
+            records: [{
+                id: userId,
+                fields: {
+                    'ID текущего трека': state.trackId,
+                    'Время текущего трека': state.currentTime,
+                    'Последнее обновление плеера': Date.now(),
+                    'Время прослушивания': String(state.totalListeningMinutes),
+                }
+            }]
+        })
+    });
 };
 
 const mapAirtableRecordToTrack = (record: AirtableTrackRecord, artistMap: Map<string, string>): Track | null => {
