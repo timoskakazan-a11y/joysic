@@ -1,7 +1,8 @@
 
+
 import React, { useState, useMemo, useCallback } from 'react';
 import type { User, Playlist, SimpleArtist, Track } from '../types';
-import { ShuffleIcon, SearchIcon, QrCodeIcon, SoundWaveIcon } from './IconComponents';
+import { ShuffleIcon, SearchIcon, QrCodeIcon, SoundWaveIcon, MatBadge } from './IconComponents';
 import TrackCover from './TrackCover';
 
 interface LibraryPageProps {
@@ -18,6 +19,7 @@ interface LibraryPageProps {
   onOpenScanner: () => void;
   currentTrackId?: string | null;
   isPlaying?: boolean;
+  onOpenMatInfo: () => void;
 }
 
 const PlaylistCard = React.memo<{ playlist: Playlist; onSelect: () => void }>(({ playlist, onSelect }) => (
@@ -54,7 +56,7 @@ const ArtistCard = React.memo<{ artist: SimpleArtist; onSelect: (id: string) => 
 });
 
 
-const SearchResultTrack = React.memo<{track: Track, isActive: boolean, isPlaying: boolean, onPlay: () => void}>(({ track, isActive, isPlaying, onPlay }) => {
+const SearchResultTrack = React.memo<{track: Track, isActive: boolean, isPlaying: boolean, onPlay: () => void, onOpenMatInfo: () => void}>(({ track, isActive, isPlaying, onPlay, onOpenMatInfo }) => {
     return (
       <div
         onClick={onPlay}
@@ -63,9 +65,12 @@ const SearchResultTrack = React.memo<{track: Track, isActive: boolean, isPlaying
         <div className="relative w-12 h-12 rounded-md bg-surface overflow-hidden flex-shrink-0">
           <TrackCover src={track.coverUrl} alt={track.title} className="w-full h-full" />
         </div>
-        <div className="flex-grow mx-4 overflow-hidden">
-          <p className={`font-semibold truncate ${isActive ? 'text-accent' : 'text-text'}`}>{track.title}</p>
-          <p className="text-sm text-text-secondary truncate">{track.artist}</p>
+        <div className="flex-grow mx-4 flex justify-between items-start gap-4">
+            <div>
+                <p className={`font-semibold ${isActive ? 'text-accent' : 'text-text'}`}>{track.title}</p>
+                <p className="text-sm text-text-secondary">{track.artist}</p>
+            </div>
+            {track.mat && <div className="flex-shrink-0"><MatBadge onClick={onOpenMatInfo} /></div>}
         </div>
         {isActive && (
             <SoundWaveIcon isPlaying={!!isPlaying} className="w-5 h-5 mx-auto text-accent flex-shrink-0" />
@@ -74,7 +79,7 @@ const SearchResultTrack = React.memo<{track: Track, isActive: boolean, isPlaying
     );
 });
 
-const LibraryPage: React.FC<LibraryPageProps> = ({ user, playlists, likedAlbums, likedArtists, tracks, onSelectPlaylist, onSelectArtist, onPlayTrack, onShufflePlayAll, onNavigateToProfile, onOpenScanner, currentTrackId, isPlaying }) => {
+const LibraryPage: React.FC<LibraryPageProps> = ({ user, playlists, likedAlbums, likedArtists, tracks, onSelectPlaylist, onSelectArtist, onPlayTrack, onShufflePlayAll, onNavigateToProfile, onOpenScanner, currentTrackId, isPlaying, onOpenMatInfo }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const lowercasedQuery = searchQuery.toLowerCase();
 
@@ -113,6 +118,7 @@ const LibraryPage: React.FC<LibraryPageProps> = ({ user, playlists, likedAlbums,
                             isActive={currentTrackId === track.id}
                             isPlaying={currentTrackId === track.id && !!isPlaying}
                             onPlay={() => onPlayTrack(track.id)}
+                            onOpenMatInfo={onOpenMatInfo}
                         />
                     ))}
                 </div>

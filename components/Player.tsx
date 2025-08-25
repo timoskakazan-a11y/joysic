@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import type { Track } from '../types';
-import { PlayIcon, PauseIcon, SkipBackIcon, SkipForwardIcon, ChevronDownIcon, HeartIcon, YouTubeIcon, MoreOptionsIcon } from './IconComponents';
+import { PlayIcon, PauseIcon, SkipBackIcon, SkipForwardIcon, ChevronDownIcon, HeartIcon, YouTubeIcon, MoreOptionsIcon, MatBadge } from './IconComponents';
 import TrackCover from './TrackCover';
 import JoycodeModal from './JoycodeModal';
 
@@ -19,6 +20,7 @@ interface PlayerProps {
   onSelectArtist: (artistId: string) => void;
   onMinimize: () => void;
   onToggleLike: () => void;
+  onOpenMatInfo: () => void;
 }
 
 const formatTime = (seconds: number) => {
@@ -28,7 +30,7 @@ const formatTime = (seconds: number) => {
   return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
 };
 
-const Player: React.FC<PlayerProps> = ({ track, isPlaying, progress, onPlayPause, onNext, onPrev, onSeek, onSelectArtist, onMinimize, isLiked, onToggleLike }) => {
+const Player: React.FC<PlayerProps> = ({ track, isPlaying, progress, onPlayPause, onNext, onPrev, onSeek, onSelectArtist, onMinimize, isLiked, onToggleLike, onOpenMatInfo }) => {
   const [bgOpacity, setBgOpacity] = useState(0.5);
   const progressPercentage = (progress.duration > 0) ? (progress.currentTime / progress.duration) * 100 : 0;
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -132,8 +134,9 @@ const Player: React.FC<PlayerProps> = ({ track, isPlaying, progress, onPlayPause
 
             {/* Track Info */}
             <div className="md:mt-auto">
-              <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-primary">
-                {track.title}
+              <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-primary flex items-start justify-center md:justify-start gap-2">
+                <span>{track.title}</span>
+                {track.mat && <MatBadge onClick={onOpenMatInfo} />}
               </h1>
               <button onClick={handleArtistClick} className="text-lg sm:text-xl font-medium text-text-secondary hover:text-primary transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50 rounded-md">
                 {track.artist}

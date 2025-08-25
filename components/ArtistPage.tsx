@@ -1,7 +1,8 @@
 
+
 import React, { useState, useEffect, useMemo } from 'react';
 import type { Artist, Playlist, Track } from '../types';
-import { PlayIcon, HeartIcon, ChevronLeftIcon, SoundWaveIcon } from './IconComponents';
+import { PlayIcon, HeartIcon, ChevronLeftIcon, SoundWaveIcon, MatBadge } from './IconComponents';
 import TrackCover from './TrackCover';
 
 const AnimatedPlaceholder: React.FC<{ className?: string }> = ({ className }) => (
@@ -19,9 +20,10 @@ interface ArtistPageProps {
   likedTrackIds: string[];
   favoriteCollectionIds: string[];
   onToggleLike: (type: 'track' | 'artist' | 'album', id: string) => void;
+  onOpenMatInfo: () => void;
 }
 
-const ArtistPage: React.FC<ArtistPageProps> = ({ artist, onBack, onPlayTrack, onSelectPlaylist, currentTrackId, isPlaying, likedArtistIds, likedTrackIds, favoriteCollectionIds, onToggleLike }) => {
+const ArtistPage: React.FC<ArtistPageProps> = ({ artist, onBack, onPlayTrack, onSelectPlaylist, currentTrackId, isPlaying, likedArtistIds, likedTrackIds, favoriteCollectionIds, onToggleLike, onOpenMatInfo }) => {
   const [isImageLoaded, setIsImageLoaded] = useState(false);
   const isLiked = likedArtistIds.includes(artist.id);
 
@@ -29,14 +31,24 @@ const ArtistPage: React.FC<ArtistPageProps> = ({ artist, onBack, onPlayTrack, on
     [...artist.tracks].sort((a, b) => (b.listens || 0) - (a.listens || 0)),
   [artist.tracks]);
 
-  const sortedAlbums = useMemo(() => 
-    artist.albums
-      .slice()
+  const sortedAlbums = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Normalize to the start of the day
+
+    const upcoming = artist.albums
+      .filter(album => album.releaseDate && new Date(album.releaseDate) >= today)
+      .sort((a, b) => new Date(a.releaseDate!).getTime() - new Date(b.releaseDate!).getTime());
+
+    const released = artist.albums
+      .filter(album => !album.releaseDate || new Date(album.releaseDate) < today)
       .sort((a, b) => {
         if (!a.releaseDate || !b.releaseDate) return 0;
         return new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime();
-      }),
-  [artist.albums]);
+      });
+      
+    return [...upcoming, ...released];
+  }, [artist.albums]);
+
 
   useEffect(() => {
     setIsImageLoaded(false); 
@@ -105,34 +117,55 @@ const ArtistPage: React.FC<ArtistPageProps> = ({ artist, onBack, onPlayTrack, on
         {sortedAlbums.length > 0 && (
             <div className="mt-12">
                 <h2 className="text-2xl font-bold text-primary mb-4">Альбомы</h2>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
+                <div className="flex gap-6 overflow-x-auto pb-4 -mx-4 sm:-mx-6 px-4 sm:px-6">
                     {sortedAlbums.map(album => {
                         const isAlbumLiked = favoriteCollectionIds.includes(album.id);
-                        const releaseYear = album.releaseDate ? new Date(album.releaseDate).getFullYear() : null;
+                        const releaseDate = album.releaseDate ? new Date(album.releaseDate) : null;
+                        const isUpcoming = releaseDate && releaseDate > new Date();
+                        const releaseYear = releaseDate ? releaseDate.getFullYear() : null;
+                        const formattedReleaseDate = releaseDate
+                            ? releaseDate.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                            : '';
+
+                        const handleAlbumClick = () => {
+                          if (!isUpcoming) {
+                            onSelectPlaylist(album);
+                          }
+                        };
+
                         return (
-                        <div key={album.id} className="group">
-                            <div className="relative aspect-square w-full rounded-2xl shadow-lg overflow-hidden bg-surface cursor-pointer" onClick={() => onSelectPlaylist(album)}>
+                        <div key={album.id} className="group w-40 sm:w-48 flex-shrink-0">
+                            <div className={`relative aspect-square w-full rounded-2xl shadow-lg overflow-hidden bg-surface ${isUpcoming ? 'cursor-default' : 'cursor-pointer'}`} onClick={handleAlbumClick}>
                                 {album.coverType === 'video' && album.coverVideoUrl ? (
                                     <video src={album.coverVideoUrl} poster={album.coverUrl} autoPlay loop muted playsInline className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
                                 ) : (
                                     <img src={album.coverUrl} alt={album.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
                                 )}
-                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                                {isUpcoming ? (
+                                    <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center text-center p-2">
+                                        <p className="font-bold text-primary text-lg">Скоро выйдет</p>
+                                        <p className="text-sm text-text-secondary">{formattedReleaseDate}</p>
+                                    </div>
+                                ) : (
+                                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                                )}
                             </div>
                             <div className="mt-3 flex justify-between items-start">
-                                <div className="overflow-hidden mr-2" onClick={() => onSelectPlaylist(album)}>
-                                    <h3 className="font-bold text-primary truncate cursor-pointer">{album.name}</h3>
+                                <div className="overflow-hidden mr-2">
+                                    <h3 className={`font-bold text-primary truncate ${isUpcoming ? '' : 'cursor-pointer'}`} onClick={handleAlbumClick}>{album.name}</h3>
                                     <p className="text-sm text-text-secondary">
                                       {releaseYear ? `${releaseYear} • ` : ''}{album.tracks.length} треков
                                     </p>
                                 </div>
-                                <button
-                                  onClick={() => onToggleLike('album', album.id)}
-                                  className={`${isAlbumLiked ? 'text-accent' : 'text-text-secondary'} hover:text-primary transition-colors p-1 -mr-1 flex-shrink-0`}
-                                  aria-label={isAlbumLiked ? 'Убрать лайк с альбома' : 'Поставить лайк на альбом'}
-                                >
-                                    <HeartIcon filled={isAlbumLiked} className="w-5 h-5" />
-                                </button>
+                                {!isUpcoming && (
+                                    <button
+                                      onClick={() => onToggleLike('album', album.id)}
+                                      className={`${isAlbumLiked ? 'text-accent' : 'text-text-secondary'} hover:text-primary transition-colors p-1 -mr-1 flex-shrink-0`}
+                                      aria-label={isAlbumLiked ? 'Убрать лайк с альбома' : 'Поставить лайк на альбом'}
+                                    >
+                                        <HeartIcon filled={isAlbumLiked} className="w-5 h-5" />
+                                    </button>
+                                )}
                             </div>
                         </div>
                     )})}
@@ -169,8 +202,9 @@ const ArtistPage: React.FC<ArtistPageProps> = ({ artist, onBack, onPlayTrack, on
                 <div className="relative w-12 h-12 rounded-md bg-surface overflow-hidden flex-shrink-0">
                   <TrackCover src={track.coverUrl} alt={track.title} className="w-full h-full" />
                 </div>
-                <div className="flex-grow mx-4">
+                <div className="flex-grow mx-4 flex justify-between items-start gap-4">
                   <p className={`font-semibold ${isActive ? 'text-accent' : 'text-text'}`}>{track.title}</p>
+                  {track.mat && <div className="flex-shrink-0"><MatBadge onClick={onOpenMatInfo} /></div>}
                 </div>
                 <div className="flex items-center gap-4 text-text-secondary text-sm">
                     <button 

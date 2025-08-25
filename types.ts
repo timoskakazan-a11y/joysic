@@ -18,6 +18,7 @@ export interface Track {
   likes: number;
   listens: number;
   youtubeClipUrl?: string;
+  mat?: boolean;
 }
 
 export interface Artist {
@@ -92,6 +93,7 @@ export interface AirtableTrackRecord {
     'Лайки'?: number;
     'Прослушивания'?: number;
     'клип'?: string;
+    'МАТ'?: boolean;
   };
 }
 

@@ -1,6 +1,7 @@
+
 import React, { useMemo } from 'react';
 import type { Playlist, Track } from '../types';
-import { PlayIcon, PauseIcon, ChevronLeftIcon, SoundWaveIcon, HeartIcon } from './IconComponents';
+import { PlayIcon, PauseIcon, ChevronLeftIcon, SoundWaveIcon, HeartIcon, MatBadge } from './IconComponents';
 import TrackCover from './TrackCover';
 
 interface PlaylistDetailPageProps {
@@ -13,9 +14,10 @@ interface PlaylistDetailPageProps {
   likedTrackIds: string[];
   favoriteCollectionIds: string[];
   onToggleLike: (type: 'track' | 'album', id: string) => void;
+  onOpenMatInfo: () => void;
 }
 
-const PlaylistDetailPage: React.FC<PlaylistDetailPageProps> = ({ playlist, onBack, onPlayTrack, currentTrackId, isPlaying, onPlayPause, likedTrackIds, favoriteCollectionIds, onToggleLike }) => {
+const PlaylistDetailPage: React.FC<PlaylistDetailPageProps> = ({ playlist, onBack, onPlayTrack, currentTrackId, isPlaying, onPlayPause, likedTrackIds, favoriteCollectionIds, onToggleLike, onOpenMatInfo }) => {
   
   const isPlaylistActive = playlist.trackIds.includes(currentTrackId || '');
   const isCurrentlyPlaying = isPlaylistActive && isPlaying;
@@ -124,9 +126,12 @@ const PlaylistDetailPage: React.FC<PlaylistDetailPageProps> = ({ playlist, onBac
                 <div className="relative w-12 h-12 rounded-md bg-surface overflow-hidden flex-shrink-0">
                   <TrackCover src={track.coverUrl} alt={track.title} className="w-full h-full" />
                 </div>
-                <div className="flex-grow mx-4">
-                  <p className={`font-semibold ${isActive ? 'text-accent' : 'text-text'}`}>{track.title}</p>
-                  <p className="text-sm text-text-secondary">{track.artist}</p>
+                <div className="flex-grow mx-4 flex justify-between items-start gap-4">
+                    <div>
+                        <p className={`font-semibold ${isActive ? 'text-accent' : 'text-text'}`}>{track.title}</p>
+                        <p className="text-sm text-text-secondary">{track.artist}</p>
+                    </div>
+                    {track.mat && <div className="flex-shrink-0"><MatBadge onClick={onOpenMatInfo}/></div>}
                 </div>
                 <div className="flex items-center gap-4 text-text-secondary text-sm">
                     <button 

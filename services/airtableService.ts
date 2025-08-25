@@ -302,6 +302,7 @@ const mapAirtableRecordToTrack = (record: AirtableTrackRecord, artistMap: Map<st
         likes: fields['Лайки'] || 0,
         listens: fields['Прослушивания'] || 0,
         youtubeClipUrl: fields['клип'],
+        mat: fields['МАТ'] || false,
     };
 };
 

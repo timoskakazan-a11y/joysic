@@ -13,6 +13,7 @@ import PlaylistDetailPage from './components/PlaylistDetailPage';
 import BetaLockScreen from './components/BetaLockScreen';
 import ScannerModal from './components/ScannerModal';
 import ProfilePage from './components/ProfilePage';
+import MatInfoModal from './components/MatInfoModal';
 
 interface AppConfig {
   BETA_LOCK_MODE: 'on' | 'off';
@@ -50,6 +51,7 @@ const App: React.FC = () => {
   const [isPlayerExpanded, setIsPlayerExpanded] = useState<boolean>(false);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [scannedTrackId, setScannedTrackId] = useState<string | null>(null);
+  const [isMatInfoModalOpen, setIsMatInfoModalOpen] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const playerSyncInterval = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -512,6 +514,7 @@ const App: React.FC = () => {
 
   const handleNavigateToProfile = useCallback(() => setView('profile'), []);
   const handleOpenScanner = useCallback(() => setIsScannerOpen(true), []);
+  const handleOpenMatInfo = useCallback(() => setIsMatInfoModalOpen(true), []);
 
   const handleExpandPlayer = () => setIsPlayerExpanded(true);
   const handleMinimizePlayer = () => setIsPlayerExpanded(false);
@@ -551,6 +554,7 @@ const App: React.FC = () => {
                     likedTrackIds={user.likedTrackIds}
                     favoriteCollectionIds={user.favoriteCollectionIds}
                     onToggleLike={handleToggleLike}
+                    onOpenMatInfo={handleOpenMatInfo}
                 />
             );
         case 'playlistDetail':
@@ -565,6 +569,7 @@ const App: React.FC = () => {
                     likedTrackIds={user.likedTrackIds}
                     favoriteCollectionIds={user.favoriteCollectionIds}
                     onToggleLike={handleToggleLike}
+                    onOpenMatInfo={handleOpenMatInfo}
                 />
             );
         case 'library':
@@ -583,6 +588,7 @@ const App: React.FC = () => {
                 onOpenScanner={handleOpenScanner}
                 currentTrackId={currentTrack?.id}
                 isPlaying={isPlaying}
+                onOpenMatInfo={handleOpenMatInfo}
             />;
     }
   }
@@ -608,6 +614,7 @@ const App: React.FC = () => {
               onMinimize={handleMinimizePlayer}
               isLiked={user.likedTrackIds.includes(currentTrack.id)}
               onToggleLike={() => handleToggleLike('track', currentTrack.id)}
+              onOpenMatInfo={handleOpenMatInfo}
             />
           </div>
           <div className={`fixed bottom-0 left-0 right-0 z-40 transition-transform duration-500 ease-in-out ${isPlayerExpanded ? 'translate-y-full' : 'translate-y-0'}`}>
@@ -617,6 +624,7 @@ const App: React.FC = () => {
       )}
       
       {isScannerOpen && <ScannerModal onClose={() => setIsScannerOpen(false)} onScanSuccess={handleScanSuccess} />}
+      {isMatInfoModalOpen && <MatInfoModal onClose={() => setIsMatInfoModalOpen(false)} />}
 
       <audio ref={audioRef} onTimeUpdate={handleTimeUpdate} onLoadedData={handleLoadedData} onEnded={handleNextTrack} className="hidden"/>
     </div>

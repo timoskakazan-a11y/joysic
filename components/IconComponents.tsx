@@ -115,3 +115,25 @@ export const CloseIcon: React.FC<IconProps> = ({ className = "w-6 h-6" }) => (
       <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
     </svg>
 );
+
+export const MatBadge: React.FC<{ onClick: () => void, className?: string }> = ({ onClick, className }) => (
+    <button
+        onClick={(e) => {
+            e.stopPropagation();
+            onClick();
+        }}
+        className={`bg-surface text-text-secondary text-[10px] font-bold px-1.5 py-0.5 rounded-md leading-none tracking-wider hover:bg-surface-light transition-colors ${className}`}
+        aria-label="Explicit content warning"
+    >
+        МАТ
+    </button>
+);
+
+export const MatBadgeStatic: React.FC<{ className?: string }> = ({ className }) => (
+    <span
+        className={`inline-block bg-surface text-text-secondary text-[9px] font-bold px-1 rounded leading-none tracking-wider ${className}`}
+        aria-label="Explicit content warning"
+    >
+        МАТ
+    </span>
+);

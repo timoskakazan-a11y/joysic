@@ -1,6 +1,7 @@
+
 import React from 'react';
 import type { Track } from '../types';
-import { PlayIcon, PauseIcon } from './IconComponents';
+import { PlayIcon, PauseIcon, MatBadgeStatic } from './IconComponents';
 import TrackCover from './TrackCover';
 
 interface MiniPlayerProps {
@@ -32,7 +33,10 @@ const MiniPlayer: React.FC<MiniPlayerProps> = ({ track, isPlaying, progress, onP
           <TrackCover src={track.coverUrl} alt={track.title} className="w-full h-full" />
         </div>
         <div className="flex-grow mx-3 overflow-hidden">
-            <p className="font-semibold text-primary truncate">{track.title}</p>
+            <div className="flex items-center gap-1.5">
+              <p className="font-semibold text-primary truncate">{track.title}</p>
+              {track.mat && <MatBadgeStatic className="flex-shrink-0"/>}
+            </div>
             <p className="text-sm text-text-secondary truncate">{track.artist}</p>
         </div>
         <button
