@@ -1,4 +1,3 @@
-
 import type { Track, Artist, AirtableTrackRecord, AirtableArtistRecord, User, AirtableUserRecord, Playlist, AirtablePlaylistRecord, Artwork, AirtableAttachment, SimpleArtist } from '../types';
 
 const AIRTABLE_BASE_ID = 'appuGObKAO57IqWRN';
@@ -6,7 +5,7 @@ const MUSIC_TABLE_NAME = 'music';
 const ARTISTS_TABLE_NAME = 'исполнители';
 const USERS_TABLE_NAME = 'пользователи';
 const PLAYLISTS_TABLE_NAME = 'плейлисты';
-const PHOTOS_TABLE_NAME = 'фото';
+const PHOTOS_TABLE_NAME = 'Фото';
 const AIRTABLE_API_KEY = 'patZi9FoyhVvaJGnt.fdefebefbc59c7f41ff1bbf09d80f9a2da8f35dcc24c98e9766dba336053487d';
 
 const fetchFromAirtable = async (tableName: string, options: RequestInit = {}, path: string = '') => {
@@ -36,7 +35,22 @@ const mapAirtableRecordToUser = (record: AirtableUserRecord): User => {
         likedTrackIds: record.fields['Лайки песен'] || [],
         likedArtistIds: record.fields['Любимые исполнители'] || [],
         favoriteCollectionIds: record.fields['Любимый плейлист'] || [],
+        avatarUrl: record.fields['Аватар']?.[0]?.url,
+        totalListeningMinutes: record.fields['Общее время прослушивания'] || 0,
     };
+};
+
+export const fetchMediaUrl = async (name: string): Promise<string | null> => {
+    const formula = `{Название} = '${name}'`;
+    try {
+        const response = await fetchFromAirtable(PHOTOS_TABLE_NAME, {}, `?filterByFormula=${encodeURIComponent(formula)}`);
+        if (response.records && response.records.length > 0 && response.records[0].fields['Фото']?.[0]?.url) {
+            return response.records[0].fields['Фото'][0].url;
+        }
+    } catch (error) {
+        console.error(`Error fetching media '${name}' from Airtable:`, error);
+    }
+    return null;
 };
 
 export const loginUser = async (email: string, password: string): Promise<User> => {
@@ -58,12 +72,20 @@ export const registerUser = async (email: string, password: string, name: string
     if (checkResponse.records && checkResponse.records.length > 0) {
         throw new Error('Пользователь с таким email уже существует');
     }
+    
+    // Fetch default avatar
+    const defaultAvatarUrl = await fetchMediaUrl('Аватар стандартный') || 'https://i.postimg.cc/G3K2BYkT/joysic.png';
 
     // 2. Create user record
     const userCreateResponse = await fetchFromAirtable(USERS_TABLE_NAME, {
         method: 'POST',
         body: JSON.stringify({
-            records: [{ fields: { 'Почта': email, 'Пароль': password, 'Имя': name } }]
+            records: [{ fields: { 
+                'Почта': email, 
+                'Пароль': password, 
+                'Имя': name,
+                'Аватар': [{ url: defaultAvatarUrl }]
+            } }]
         })
     });
 
@@ -72,7 +94,7 @@ export const registerUser = async (email: string, password: string, name: string
     }
     const newUserId = userCreateResponse.records[0].id;
 
-    // Fetch cover photo for "Любимое" playlist from the "фото" table
+    // Fetch cover photo for "Любимое" playlist from the "Фото" table
     const photoFormula = `{Название} = 'Любимое плейлист'`;
     const photoResponse = await fetchFromAirtable(PHOTOS_TABLE_NAME, {}, `?filterByFormula=${encodeURIComponent(photoFormula)}`);
     
@@ -201,6 +223,20 @@ export const incrementTrackStats = async (trackId: string, field: 'Лайки' |
             }]
         })
     });
+};
+
+export const updateUserListeningTime = async (userId: string, totalMinutes: number): Promise<void> => {
+  await fetchFromAirtable(USERS_TABLE_NAME, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      records: [{
+        id: userId,
+        fields: {
+          'Общее время прослушивания': totalMinutes
+        }
+      }]
+    })
+  });
 };
 
 const mapAirtableRecordToTrack = (record: AirtableTrackRecord, artistMap: Map<string, string>): Track | null => {

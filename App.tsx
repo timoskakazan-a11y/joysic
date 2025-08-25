@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { fetchTracks, fetchArtistDetails, loginUser, registerUser, updateUserLikes, fetchPlaylistsForUser, incrementTrackStats, fetchBetaImage, fetchSimpleArtistsByIds } from './services/airtableService';
+import { fetchTracks, fetchArtistDetails, loginUser, registerUser, updateUserLikes, fetchPlaylistsForUser, incrementTrackStats, fetchBetaImage, fetchSimpleArtistsByIds, updateUserListeningTime } from './services/airtableService';
 import type { Track, Artist, User, Playlist, SimpleArtist } from './types';
 import Player from './components/Player';
 import ArtistPage from './components/ArtistPage';
@@ -11,6 +11,7 @@ import LibraryPage from './components/LibraryPage';
 import PlaylistDetailPage from './components/PlaylistDetailPage';
 import BetaLockScreen from './components/BetaLockScreen';
 import ScannerModal from './components/ScannerModal';
+import ProfilePage from './components/ProfilePage';
 
 interface AppConfig {
   BETA_LOCK_MODE: 'on' | 'off';
@@ -40,7 +41,7 @@ const App: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState({ currentTime: 0, duration: 0 });
 
-  const [view, setView] = useState<'library' | 'artist' | 'playlistDetail'>('library');
+  const [view, setView] = useState<'library' | 'artist' | 'playlistDetail' | 'profile'>('library');
   const [selectedArtist, setSelectedArtist] = useState<Artist | null>(null);
   const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | null>(null);
   const [isArtistLoading, setIsArtistLoading] = useState<boolean>(false);
@@ -49,6 +50,7 @@ const App: React.FC = () => {
   const [scannedTrackId, setScannedTrackId] = useState<string | null>(null);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const listenTimeTracker = useRef({ sessionSeconds: 0, lastSavedTotalMinutes: 0 });
   const currentTrack = currentTrackIndex !== null && shuffledTracks.length > 0 ? shuffledTracks[currentTrackIndex] : null;
 
   useEffect(() => {
@@ -74,10 +76,44 @@ const App: React.FC = () => {
     if (isCheckingBeta || isBetaLocked) return;
     const savedUser = localStorage.getItem('joysicUser');
     if (savedUser) {
-      setUser(JSON.parse(savedUser));
+      const parsedUser = JSON.parse(savedUser);
+      setUser(parsedUser);
+      listenTimeTracker.current.lastSavedTotalMinutes = parsedUser.totalListeningMinutes || 0;
     }
     setIsAuthLoading(false);
   }, [isCheckingBeta, isBetaLocked]);
+  
+    // Effect for tracking listening time
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval> | null = null;
+    if (isPlaying && user) {
+      interval = setInterval(() => {
+        listenTimeTracker.current.sessionSeconds += 1;
+
+        // Save to Airtable every minute (60 seconds)
+        if (listenTimeTracker.current.sessionSeconds % 60 === 0) {
+          const newTotalMinutes = listenTimeTracker.current.lastSavedTotalMinutes + (listenTimeTracker.current.sessionSeconds / 60);
+          
+          setUser(currentUser => {
+              if (!currentUser) return null;
+              const updatedUser = { ...currentUser, totalListeningMinutes: newTotalMinutes };
+              localStorage.setItem('joysicUser', JSON.stringify(updatedUser));
+              return updatedUser;
+          });
+          
+          updateUserListeningTime(user.id, newTotalMinutes).catch(err => {
+            console.error("Failed to update listening time:", err);
+            // In case of failure, we can add retry logic or just wait for the next interval
+          });
+        }
+      }, 1000);
+    }
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [isPlaying, user]);
 
   const loadAppData = useCallback(async (currentUser: User) => {
     try {
@@ -146,12 +182,14 @@ const App: React.FC = () => {
     const loggedInUser = await loginUser(email, pass);
     setUser(loggedInUser);
     localStorage.setItem('joysicUser', JSON.stringify(loggedInUser));
+    listenTimeTracker.current.lastSavedTotalMinutes = loggedInUser.totalListeningMinutes || 0;
   };
   
   const handleRegister = async (email: string, pass: string, name: string) => {
     const newUser = await registerUser(email, pass, name);
     setUser(newUser);
     localStorage.setItem('joysicUser', JSON.stringify(newUser));
+     listenTimeTracker.current.lastSavedTotalMinutes = 0;
   };
 
   const handleLogout = () => {
@@ -422,6 +460,17 @@ const App: React.FC = () => {
 
   const mainContent = () => {
     switch(view) {
+        case 'profile':
+            return <ProfilePage 
+                user={user}
+                stats={{
+                    likedTracksCount: user.likedTrackIds.length,
+                    likedArtistsCount: user.likedArtistIds.length,
+                    likedAlbumsCount: likedAlbums.length,
+                }}
+                onBack={() => setView('library')}
+                onLogout={handleLogout}
+            />;
         case 'artist':
             return isArtistLoading || !selectedArtist ? (
                 <div className="min-h-screen flex justify-center items-center"><div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-surface-light"></div></div>
@@ -465,7 +514,7 @@ const App: React.FC = () => {
                 onSelectArtist={handleSelectArtist}
                 onPlayTrack={(trackId) => handlePlayTrack(trackId, tracks)}
                 onShufflePlayAll={handleShufflePlayAll} 
-                onLogout={handleLogout} 
+                onNavigateToProfile={() => setView('profile')} 
                 onOpenScanner={() => setIsScannerOpen(true)}
                 currentTrackId={currentTrack?.id}
                 isPlaying={isPlaying}

@@ -14,7 +14,7 @@ interface LibraryPageProps {
   onSelectArtist: (artistId: string) => void;
   onPlayTrack: (trackId: string) => void;
   onShufflePlayAll: () => void;
-  onLogout: () => void;
+  onNavigateToProfile: () => void;
   onOpenScanner: () => void;
   currentTrackId?: string | null;
   isPlaying?: boolean;
@@ -67,7 +67,7 @@ const SearchResultTrack: React.FC<{track: Track, isActive: boolean, isPlaying: b
     );
 };
 
-const LibraryPage: React.FC<LibraryPageProps> = ({ user, playlists, likedAlbums, likedArtists, tracks, onSelectPlaylist, onSelectArtist, onPlayTrack, onShufflePlayAll, onLogout, onOpenScanner, currentTrackId, isPlaying }) => {
+const LibraryPage: React.FC<LibraryPageProps> = ({ user, playlists, likedAlbums, likedArtists, tracks, onSelectPlaylist, onSelectArtist, onPlayTrack, onShufflePlayAll, onNavigateToProfile, onOpenScanner, currentTrackId, isPlaying }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const lowercasedQuery = searchQuery.toLowerCase();
 
@@ -211,8 +211,16 @@ const LibraryPage: React.FC<LibraryPageProps> = ({ user, playlists, likedAlbums,
             <h1 className="text-3xl sm:text-4xl font-black text-primary">Медиатека</h1>
             <p className="text-text-secondary">Добро пожаловать, {user.name}!</p>
         </div>
-        <button onClick={onLogout} className="bg-surface-light px-4 py-2 rounded-lg text-sm font-bold text-text hover:bg-surface transition-colors">
-            Выйти
+        <button 
+          onClick={onNavigateToProfile} 
+          className="w-12 h-12 rounded-full overflow-hidden bg-surface-light hover:ring-2 hover:ring-accent transition-all"
+          aria-label="Open profile"
+        >
+            <img 
+                src={user.avatarUrl || 'https://i.postimg.cc/G3K2BYkT/joysic.png'} 
+                alt="User Avatar" 
+                className="w-full h-full object-cover" 
+            />
         </button>
       </header>
 
