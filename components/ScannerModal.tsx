@@ -10,45 +10,34 @@ interface ScannerModalProps {
 }
 
 const ScannerModal: React.FC<ScannerModalProps> = ({ onClose, onScanSuccess }) => {
-    // A ref to the DOM element that will contain the camera view.
-    const scannerContainerRef = useRef<HTMLDivElement>(null);
-    // A ref to hold the scanner library instance. This is key to avoiding re-initialization.
+    const scannerContainerId = "joysic-qr-reader";
     const scannerInstanceRef = useRef<any>(null);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         // This effect manages the entire lifecycle of the scanner.
-        // It runs only once when the component mounts.
-
-        if (!scannerContainerRef.current) {
-            console.error("Scanner container ref is not available.");
-            return;
-        }
-
-        // We will assign the instance to our ref.
-        scannerInstanceRef.current = new Html5Qrcode(scannerContainerRef.current.id);
-        const scanner = scannerInstanceRef.current;
+        // It runs only once when the component mounts and cleans up on unmount.
+        
+        const scanner = new Html5Qrcode(scannerContainerId);
+        scannerInstanceRef.current = scanner;
 
         const successCallback = (decodedText: string) => {
-            // Ensure we don't process scans after starting to tear down.
-            if (scanner && scanner.isScanning) {
-                // Stop the scanner immediately on a successful scan.
-                scanner.stop()
+            const instance = scannerInstanceRef.current;
+            if (instance && instance.isScanning) {
+                instance.stop()
                     .then(() => {
                         console.log("Scanner stopped on success.");
-                        // Only after stopping, call the success handler.
                         onScanSuccess(decodedText);
                     })
                     .catch((err: any) => {
                         console.error("Failed to stop scanner after success.", err);
-                        // Still call the handler to ensure functionality.
-                        onScanSuccess(decodedText);
+                        onScanSuccess(decodedText); // Proceed even if stopping fails
                     });
             }
         };
 
         const errorCallback = (errorMessage: string) => {
-            // The library calls this frequently. It's safe to ignore.
+            // This callback is called frequently, it's safe to ignore most "errors" as the library tries to decode frames.
         };
         
         const config = {
@@ -59,45 +48,64 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ onClose, onScanSuccess }) =
             },
         };
 
-        // Start the camera and scanner.
-        scanner.start(
-            { facingMode: "environment" }, // Use the rear camera
-            config,
-            successCallback,
-            errorCallback
-        ).catch((err: any) => {
-            console.error("Unable to start scanning.", err);
-            setError("Не удалось получить доступ к камере. Проверьте разрешения.");
+        // Explicitly get cameras to find the rear-facing one. This is more reliable.
+        Html5Qrcode.getCameras().then((devices: any[]) => {
+            if (devices && devices.length) {
+                // Find the rear camera using the 'environment' facing mode standard.
+                const rearCamera = devices.find((device: any) => device.facing === 'environment');
+                const cameraId = rearCamera ? rearCamera.id : devices[0].id; // Fallback to the first camera if no rear camera is found.
+
+                scanner.start(
+                    cameraId, // Use the specific camera ID
+                    config,
+                    successCallback,
+                    errorCallback
+                ).catch((err: any) => {
+                    console.error("Unable to start scanning with selected camera.", err);
+                    setError("Не удалось запустить камеру. Проверьте разрешения в настройках браузера.");
+                });
+            } else {
+                 setError("Камеры не найдены на этом устройстве.");
+            }
+        }).catch((err: any) => {
+            console.error("Error getting camera list.", err);
+            setError("Не удалось получить доступ к камере. Убедитесь, что вы предоставили разрешение.");
         });
 
         // The cleanup function is critical. It runs when the component unmounts.
         return () => {
             const instance = scannerInstanceRef.current;
             if (instance && instance.isScanning) {
-                instance.stop()
-                    .then(() => console.log("Scanner stopped on cleanup."))
-                    .catch((err: any) => console.error("Failed to stop scanner on cleanup.", err));
+                instance.stop().catch((err: any) => {
+                    console.error("Failed to stop scanner on cleanup.", err);
+                });
             }
         };
-    }, []); // The empty dependency array is crucial. It ensures this runs only once.
-             // We rely on the `onScanSuccess` prop being stable from the parent (`useCallback`).
+    }, [onScanSuccess]);
 
     return (
         <div 
             className="fixed inset-0 bg-black z-[100] flex items-center justify-center animate-fadeInScaleUp"
         >
-            <div id="joysic-qr-reader" ref={scannerContainerRef} className="absolute inset-0 [&>video]:w-full [&>video]:h-full [&>video]:object-cover"></div>
+            {/* The element for the scanner video feed */}
+            <div id={scannerContainerId} className="absolute inset-0 w-full h-full [&>video]:w-full [&>video]:h-full [&>video]:object-cover"></div>
             
+            {/* Error Display */}
             {error && (
-                <div className="absolute inset-0 bg-black flex items-center justify-center p-4 text-center text-red-300 z-10">
-                    <p>{error}</p>
+                <div className="absolute inset-0 bg-black/80 flex items-center justify-center p-4 text-center z-10">
+                    <div className="bg-surface p-6 rounded-lg">
+                        <p className="text-red-300 font-semibold mb-4">Ошибка сканера</p>
+                        <p className="text-text-secondary text-sm">{error}</p>
+                    </div>
                 </div>
             )}
             
             {/* Viewfinder UI */}
             <div className="absolute inset-0 pointer-events-none flex items-center justify-center" aria-hidden="true">
                 <div className="w-[80vw] h-[80vw] max-w-sm max-h-sm relative">
+                    {/* This creates the dark overlay *outside* the square */}
                     <div className="absolute inset-0 shadow-[0_0_0_9999px_rgba(0,0,0,0.7)]"></div>
+                    {/* Corner markers */}
                     <div className="absolute -top-1 -left-1 w-12 h-12 border-t-4 border-l-4 border-white/90 rounded-tl-2xl"></div>
                     <div className="absolute -top-1 -right-1 w-12 h-12 border-t-4 border-r-4 border-white/90 rounded-tr-2xl"></div>
                     <div className="absolute -bottom-1 -left-1 w-12 h-12 border-b-4 border-l-4 border-white/90 rounded-bl-2xl"></div>
