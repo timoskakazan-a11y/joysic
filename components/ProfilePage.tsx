@@ -37,11 +37,11 @@ const StatItem: React.FC<{ icon: React.ReactNode, value: number, label: string }
 );
 
 const ProfilePage: React.FC<ProfilePageProps> = ({ user, stats, onBack, onLogout }) => {
-    const [hamsterVideoUrl, setHamsterVideoUrl] = useState<string | null>(null);
+    const [monkeyImageUrl, setMonkeyImageUrl] = useState<string | null>(null);
     const { hours, minutes } = formatListeningTime(user.totalListeningMinutes);
 
     useEffect(() => {
-        fetchMediaUrl('Хомяк').then(setHamsterVideoUrl);
+        fetchMediaUrl('Обезьяна').then(setMonkeyImageUrl);
     }, []);
 
     return (
@@ -71,15 +71,12 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, stats, onBack, onLogout
 
                 {/* Stats Card */}
                 <div className="bg-surface rounded-2xl shadow-lg overflow-hidden flex items-center">
-                    {hamsterVideoUrl && (
+                    {monkeyImageUrl && (
                         <div className="w-2/5 flex-shrink-0">
                             <div className="relative aspect-square">
-                                <video
-                                    src={hamsterVideoUrl}
-                                    autoPlay
-                                    loop
-                                    muted
-                                    playsInline
+                                <img
+                                    src={monkeyImageUrl}
+                                    alt="Decorative animation"
                                     className="absolute inset-0 w-full h-full object-cover"
                                 />
                             </div>
