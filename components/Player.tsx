@@ -134,9 +134,9 @@ const Player: React.FC<PlayerProps> = ({ track, isPlaying, progress, onPlayPause
 
             {/* Track Info */}
             <div className="md:mt-auto">
-              <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-primary flex items-start justify-center md:justify-start gap-2">
-                <span>{track.title}</span>
-                {track.mat && <MatBadge onClick={onOpenMatInfo} />}
+              <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-primary text-center md:text-left">
+                {track.title}
+                {track.mat && <MatBadge onClick={onOpenMatInfo} className="inline-block align-middle ml-2" />}
               </h1>
               <button onClick={handleArtistClick} className="text-lg sm:text-xl font-medium text-text-secondary hover:text-primary transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50 rounded-md">
                 {track.artists.map(a => a.name).join(', ')}

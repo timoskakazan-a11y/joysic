@@ -11,6 +11,8 @@ interface LibraryPageProps {
   likedAlbums: Playlist[];
   likedArtists: SimpleArtist[];
   tracks: Track[];
+  allArtists: SimpleArtist[];
+  allCollections: Playlist[];
   onSelectPlaylist: (playlist: Playlist) => void;
   onSelectArtist: (artistId: string) => void;
   onPlayTrack: (trackId: string) => void;
@@ -22,21 +24,47 @@ interface LibraryPageProps {
   onOpenMatInfo: () => void;
 }
 
-const PlaylistCard = React.memo<{ playlist: Playlist; onSelect: () => void }>(({ playlist, onSelect }) => (
-  <div onClick={onSelect} className="group cursor-pointer">
-    <div className="relative aspect-square w-full rounded-2xl shadow-lg overflow-hidden bg-surface">
-      {playlist.coverType === 'video' && playlist.coverVideoUrl ? (
-        <video src={playlist.coverVideoUrl} poster={playlist.coverUrl} autoPlay loop muted playsInline className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
-      ) : (
-        <img src={playlist.coverUrl} alt={playlist.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
-      )}
+const PlaylistCard = React.memo<{ playlist: Playlist; onSelect: (playlist: Playlist) => void }>(({ playlist, onSelect }) => {
+  const releaseDate = playlist.releaseDate ? new Date(playlist.releaseDate) : null;
+  const today = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, []);
+  const isUpcoming = releaseDate && releaseDate >= today;
+  
+  const formattedReleaseDate = releaseDate
+    ? releaseDate.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    : '';
+
+  const handleSelect = () => {
+    if (!isUpcoming) {
+      onSelect(playlist);
+    }
+  };
+  
+  return (
+    <div onClick={handleSelect} className={`group ${isUpcoming ? 'cursor-default' : 'cursor-pointer'}`}>
+      <div className="relative aspect-square w-full rounded-2xl shadow-lg overflow-hidden bg-surface">
+        {playlist.coverType === 'video' && playlist.coverVideoUrl ? (
+          <video src={playlist.coverVideoUrl} poster={playlist.coverUrl} autoPlay loop muted playsInline className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+        ) : (
+          <img src={playlist.coverUrl} alt={playlist.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+        )}
+        {isUpcoming && (
+            <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center text-center p-2">
+                <p className="font-bold text-primary text-lg">Скоро выйдет</p>
+                <p className="text-sm text-text-secondary">{formattedReleaseDate}</p>
+            </div>
+        )}
+      </div>
+      <div className="mt-3">
+        <h3 className="font-bold text-primary truncate">{playlist.name}</h3>
+        <p className="text-sm text-text-secondary">{playlist.trackIds.length} треков</p>
+      </div>
     </div>
-    <div className="mt-3">
-      <h3 className="font-bold text-primary truncate">{playlist.name}</h3>
-      <p className="text-sm text-text-secondary">{playlist.tracks.length} треков</p>
-    </div>
-  </div>
-));
+  );
+});
 
 const ArtistCard = React.memo<{ artist: SimpleArtist; onSelect: (id: string) => void }>(({ artist, onSelect }) => {
   const handleSelect = useCallback(() => {
@@ -66,10 +94,10 @@ const SearchResultTrack = React.memo<{track: Track, isActive: boolean, isPlaying
           <TrackCover src={track.coverUrl} alt={track.title} className="w-full h-full" />
         </div>
         <div className="flex-grow mx-4 overflow-hidden">
-          <div className="flex items-baseline gap-2">
-              <p className={`font-semibold ${isActive ? 'text-accent' : 'text-text'}`}>{track.title}</p>
-              {track.mat && <MatBadge onClick={onOpenMatInfo} className="flex-shrink-0"/>}
-          </div>
+          <p className={`font-semibold ${isActive ? 'text-accent' : 'text-text'}`}>
+              {track.title}
+              {track.mat && <MatBadge onClick={onOpenMatInfo} className="inline-block align-baseline ml-1.5"/>}
+          </p>
           <p className="text-sm text-text-secondary">{track.artists.map(a => a.name).join(', ')}</p>
         </div>
         {isActive && (
@@ -79,39 +107,44 @@ const SearchResultTrack = React.memo<{track: Track, isActive: boolean, isPlaying
     );
 });
 
-const LibraryPage: React.FC<LibraryPageProps> = ({ user, playlists, likedAlbums, likedArtists, tracks, onSelectPlaylist, onSelectArtist, onPlayTrack, onShufflePlayAll, onNavigateToProfile, onOpenScanner, currentTrackId, isPlaying, onOpenMatInfo }) => {
+const LibraryPage: React.FC<LibraryPageProps> = ({ user, playlists, likedAlbums, likedArtists, tracks, allArtists, allCollections, onSelectPlaylist, onSelectArtist, onPlayTrack, onShufflePlayAll, onNavigateToProfile, onOpenScanner, currentTrackId, isPlaying, onOpenMatInfo }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const lowercasedQuery = searchQuery.toLowerCase();
-
-  const filteredPlaylists = useMemo(() => 
-      playlists.filter(p => p.name.toLowerCase().includes(lowercasedQuery)),
-  [playlists, lowercasedQuery]);
   
-  const filteredAlbums = useMemo(() =>
-      likedAlbums.filter(a => a.name.toLowerCase().includes(lowercasedQuery)),
-  [likedAlbums, lowercasedQuery]);
+  const searchResults = useMemo(() => {
+    if (searchQuery.trim().length < 2) {
+        return { tracks: [], artists: [], albums: [], playlists: [] };
+    }
+    const lowercasedQuery = searchQuery.toLowerCase();
 
-  const filteredArtists = useMemo(() =>
-      likedArtists.filter(a => a.name.toLowerCase().includes(lowercasedQuery)),
-  [likedArtists, lowercasedQuery]);
+    const filteredTracks = tracks.filter(t => 
+        t.title.toLowerCase().includes(lowercasedQuery) ||
+        t.artists.some(a => a.name.toLowerCase().includes(lowercasedQuery))
+    );
+    
+    const filteredArtists = allArtists.filter(a => 
+        a.name.toLowerCase().includes(lowercasedQuery)
+    );
 
-  const filteredTracks = useMemo(() => {
-      if (searchQuery.trim().length < 2) return [];
-      return tracks.filter(t => 
-          t.title.toLowerCase().includes(lowercasedQuery) ||
-          t.artists.some(a => a.name.toLowerCase().includes(lowercasedQuery))
-      );
-  }, [tracks, lowercasedQuery, searchQuery]);
+    const filteredCollections = allCollections.filter(c =>
+        c.name.toLowerCase().includes(lowercasedQuery)
+    );
+    
+    const filteredAlbums = filteredCollections.filter(c => c.collectionType === 'альбом');
+    const filteredPlaylists = filteredCollections.filter(c => c.collectionType === 'плейлист');
+
+    return { tracks: filteredTracks, artists: filteredArtists, albums: filteredAlbums, playlists: filteredPlaylists };
+  }, [searchQuery, tracks, allArtists, allCollections]);
+
 
   const hasContent = playlists.length > 0 || likedAlbums.length > 0 || likedArtists.length > 0;
   
   const SearchResults = () => (
     <div className="animate-fadeInScaleUp space-y-8">
-        {filteredTracks.length > 0 && (
+        {searchResults.tracks.length > 0 && (
             <div>
                 <h2 className="text-2xl font-bold text-primary mb-4">Треки</h2>
                 <div className="space-y-2">
-                    {filteredTracks.map(track => (
+                    {searchResults.tracks.map(track => (
                         <SearchResultTrack 
                             key={track.id} 
                             track={track}
@@ -125,40 +158,40 @@ const LibraryPage: React.FC<LibraryPageProps> = ({ user, playlists, likedAlbums,
             </div>
         )}
 
-        {filteredArtists.length > 0 && (
+        {searchResults.artists.length > 0 && (
              <div>
               <h2 className="text-2xl font-bold text-primary mb-4">Исполнители</h2>
               <div className="flex gap-6 overflow-x-auto pb-4 -mx-4 sm:-mx-6 px-4 sm:px-6">
-                {filteredArtists.map(artist => (
+                {searchResults.artists.map(artist => (
                   <ArtistCard key={artist.id} artist={artist} onSelect={onSelectArtist} />
                 ))}
               </div>
             </div>
         )}
 
-        {filteredAlbums.length > 0 && (
+        {searchResults.albums.length > 0 && (
             <div>
                 <h2 className="text-2xl font-bold text-primary mb-4">Альбомы</h2>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
-                    {filteredAlbums.map(album => (
-                        <PlaylistCard key={album.id} playlist={album} onSelect={() => onSelectPlaylist(album)} />
+                    {searchResults.albums.map(album => (
+                        <PlaylistCard key={album.id} playlist={album} onSelect={onSelectPlaylist} />
                     ))}
                 </div>
             </div>
         )}
 
-        {filteredPlaylists.length > 0 && (
+        {searchResults.playlists.length > 0 && (
             <div>
                 <h2 className="text-2xl font-bold text-primary mb-4">Плейлисты</h2>
                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
-                    {filteredPlaylists.map(playlist => (
-                        <PlaylistCard key={playlist.id} playlist={playlist} onSelect={() => onSelectPlaylist(playlist)} />
+                    {searchResults.playlists.map(playlist => (
+                        <PlaylistCard key={playlist.id} playlist={playlist} onSelect={onSelectPlaylist} />
                     ))}
                 </div>
             </div>
         )}
 
-        {filteredTracks.length === 0 && filteredArtists.length === 0 && filteredAlbums.length === 0 && filteredPlaylists.length === 0 && (
+        {searchResults.tracks.length === 0 && searchResults.artists.length === 0 && searchResults.albums.length === 0 && searchResults.playlists.length === 0 && (
             <div className="text-center py-20">
                 <p className="text-text-secondary">Ничего не найдено по запросу "{searchQuery}"</p>
             </div>
@@ -187,7 +220,7 @@ const LibraryPage: React.FC<LibraryPageProps> = ({ user, playlists, likedAlbums,
               <p className="text-sm text-purple-200 mt-1">Вся ваша музыка</p>
             </div>
             {playlists.map(playlist => (
-              <PlaylistCard key={playlist.id} playlist={playlist} onSelect={() => onSelectPlaylist(playlist)} />
+              <PlaylistCard key={playlist.id} playlist={playlist} onSelect={onSelectPlaylist} />
             ))}
           </div>
 
@@ -207,7 +240,7 @@ const LibraryPage: React.FC<LibraryPageProps> = ({ user, playlists, likedAlbums,
               <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-primary mb-8">Лайкнутые альбомы</h2>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
                 {likedAlbums.map(album => (
-                  <PlaylistCard key={album.id} playlist={album} onSelect={() => onSelectPlaylist(album)} />
+                  <PlaylistCard key={album.id} playlist={album} onSelect={onSelectPlaylist} />
                 ))}
               </div>
             </div>

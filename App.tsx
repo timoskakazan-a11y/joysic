@@ -1,7 +1,7 @@
 
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { fetchTracks, fetchArtistDetails, loginUser, registerUser, updateUserLikes, fetchPlaylistsForUser, incrementTrackStats, fetchBetaImage, fetchSimpleArtistsByIds, updateUserListeningTime } from './services/airtableService';
+import { fetchTracks, fetchArtistDetails, loginUser, registerUser, updateUserLikes, fetchPlaylistsForUser, incrementTrackStats, fetchBetaImage, fetchSimpleArtistsByIds, updateUserListeningTime, fetchAllArtists, fetchAllCollections } from './services/airtableService';
 import type { Track, Artist, User, Playlist, SimpleArtist } from './types';
 import Player from './components/Player';
 import ArtistPage from './components/ArtistPage';
@@ -36,6 +36,8 @@ const App: React.FC = () => {
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [likedAlbums, setLikedAlbums] = useState<Playlist[]>([]);
   const [likedArtists, setLikedArtists] = useState<SimpleArtist[]>([]);
+  const [allArtists, setAllArtists] = useState<SimpleArtist[]>([]);
+  const [allCollections, setAllCollections] = useState<Playlist[]>([]);
   const [shuffledTracks, setShuffledTracks] = useState<Track[]>([]);
   const [currentTrackIndex, setCurrentTrackIndex] = useState<number | null>(null);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
@@ -139,17 +141,21 @@ const App: React.FC = () => {
   const loadAppData = useCallback(async (currentUser: User) => {
     try {
       setIsLoading(true);
-      const [fetchedTracks, { playlists: fetchedPlaylists, likedAlbums: fetchedLikedAlbums, favoritesPlaylistId: favId }, fetchedLikedArtists] = await Promise.all([
+      const [fetchedTracks, { playlists: fetchedPlaylists, likedAlbums: fetchedLikedAlbums, favoritesPlaylistId: favId }, fetchedLikedArtists, fetchedAllArtists, fetchedAllCollections] = await Promise.all([
         fetchTracks(),
         fetchPlaylistsForUser(currentUser),
         fetchSimpleArtistsByIds(currentUser.likedArtistIds),
+        fetchAllArtists(),
+        fetchAllCollections(),
       ]);
       
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      const allAlbums = [...fetchedPlaylists, ...fetchedLikedAlbums].filter(p => p.collectionType === 'альбом');
+      
+      // Use all collections from the system to correctly identify unreleased tracks
+      const allSystemAlbums = fetchedAllCollections.filter(p => p.collectionType === 'альбом');
       const unreleasedTrackIds = new Set<string>();
-      allAlbums.forEach(album => {
+      allSystemAlbums.forEach(album => {
         if (album.releaseDate && new Date(album.releaseDate) >= today) {
           album.trackIds.forEach(tid => unreleasedTrackIds.add(tid));
         }
@@ -157,6 +163,8 @@ const App: React.FC = () => {
       
       const releasedTracks = fetchedTracks.filter(track => !unreleasedTrackIds.has(track.id));
       setTracks(releasedTracks);
+      setAllArtists(fetchedAllArtists);
+      setAllCollections(fetchedAllCollections);
       
       setFavoritesPlaylistId(favId);
       setLikedArtists(fetchedLikedArtists);
@@ -241,6 +249,8 @@ const App: React.FC = () => {
     setPlaylists([]);
     setLikedAlbums([]);
     setLikedArtists([]);
+    setAllArtists([]);
+    setAllCollections([]);
     setShuffledTracks([]);
     setCurrentTrackIndex(null);
     setIsPlaying(false);
@@ -566,6 +576,8 @@ const App: React.FC = () => {
                 likedAlbums={likedAlbums} 
                 likedArtists={likedArtists}
                 tracks={tracks}
+                allArtists={allArtists}
+                allCollections={allCollections}
                 onSelectPlaylist={handleSelectPlaylist} 
                 onSelectArtist={handleSelectArtist}
                 onPlayTrack={(trackId) => handlePlayTrack(trackId, tracks)}

@@ -1,4 +1,5 @@
 
+
 import type { Track, Artist, AirtableTrackRecord, AirtableArtistRecord, User, AirtableUserRecord, Playlist, AirtablePlaylistRecord, Artwork, AirtableAttachment, SimpleArtist } from '../types';
 
 const AIRTABLE_BASE_ID = 'appuGObKAO57IqWRN';
@@ -529,6 +530,15 @@ export const fetchAllArtists = async (): Promise<SimpleArtist[]> => {
     const response = await fetchFromAirtable(ARTISTS_TABLE_NAME, {}, '?fields%5B%5D=Имя&fields%5B%5D=Фото');
     const artistRecords: AirtableArtistRecord[] = response.records || [];
     return artistRecords.map(mapAirtableRecordToSimpleArtist);
+};
+
+export const fetchAllCollections = async (): Promise<Playlist[]> => {
+    const response = await fetchFromAirtable(PLAYLISTS_TABLE_NAME, {});
+    const allPlaylistRecords: AirtablePlaylistRecord[] = response.records || [];
+    
+    return allPlaylistRecords
+        .map(mapAirtableRecordToPlaylist)
+        .filter((p): p is Playlist => p !== null);
 };
 
 export const createTrack = async (trackData: {

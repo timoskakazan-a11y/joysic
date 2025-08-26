@@ -203,10 +203,10 @@ const ArtistPage: React.FC<ArtistPageProps> = ({ artist, onBack, onPlayTrack, on
                   <TrackCover src={track.coverUrl} alt={track.title} className="w-full h-full" />
                 </div>
                 <div className="flex-grow mx-4 overflow-hidden">
-                  <div className="flex items-baseline gap-2">
-                    <p className={`font-semibold ${isActive ? 'text-accent' : 'text-text'}`}>{track.title}</p>
-                    {track.mat && <MatBadge onClick={onOpenMatInfo} className="flex-shrink-0" />}
-                  </div>
+                  <p className={`font-semibold ${isActive ? 'text-accent' : 'text-text'}`}>
+                    {track.title}
+                    {track.mat && <MatBadge onClick={onOpenMatInfo} className="inline-block align-baseline ml-1.5" />}
+                  </p>
                   <p className="text-sm text-text-secondary">{track.artists.map(a => a.name).join(', ')}</p>
                 </div>
                 <div className="flex items-center gap-4 text-text-secondary text-sm">
