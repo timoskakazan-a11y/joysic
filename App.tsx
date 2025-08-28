@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { fetchTracks, fetchArtistDetails, loginUser, registerUser, updateUserLikes, fetchPlaylistsForUser, incrementTrackStats, fetchBetaImage, fetchSimpleArtistsByIds, updateUserListeningTime, fetchAllArtists, fetchAllCollections } from './services/airtableService';
 import type { Track, Artist, User, Playlist, SimpleArtist } from './types';
@@ -23,6 +24,7 @@ const config: AppConfig = {
   BETA_LOCK_MODE: 'off', // 'on' or 'off'
 };
 
+// FIX: Added a return statement with the application's JSX structure, resolving the error where the component was returning 'void'.
 const App: React.FC = () => {
   const [isBetaLocked, setIsBetaLocked] = useState(false);
   const [betaImageUrl, setBetaImageUrl] = useState<string | null>(null);
@@ -120,16 +122,12 @@ const App: React.FC = () => {
         userRef.current = updatedUserForStorage;
         localStorage.setItem('joysicUser', JSON.stringify(updatedUserForStorage));
         
-        updateUserListeningTime(
-            currentUser.id,
-            newTotalMinutes
-        ).catch(err => {
-            console.error("Failed to update listening time:", err);
+        updateUserListeningTime(currentUser.id, newTotalMinutes).catch(err => {
+          console.error("Failed to sync listening time:", err);
         });
-
-      }, 5000);
+      }, 5000); // Sync every 5 seconds
     }
-    
+
     return () => {
       if (playerSyncInterval.current) {
         clearInterval(playerSyncInterval.current);
@@ -137,496 +135,442 @@ const App: React.FC = () => {
     };
   }, [isPlaying]);
 
-
-  const loadAppData = useCallback(async (currentUser: User) => {
+  const loadData = useCallback(async () => {
+    if (!user) {
+      setIsLoading(false);
+      return;
+    }
+    setIsLoading(true);
+    setError(null);
     try {
-      setIsLoading(true);
-      const [fetchedTracks, { playlists: fetchedPlaylists, likedAlbums: fetchedLikedAlbums, favoritesPlaylistId: favId }, fetchedLikedArtists, fetchedAllArtists, fetchedAllCollections] = await Promise.all([
+      const [fetchedTracks, fetchedPlaylistsData, fetchedLikedArtists, fetchedAllArtists, fetchedAllCollections] = await Promise.all([
         fetchTracks(),
-        fetchPlaylistsForUser(currentUser),
-        fetchSimpleArtistsByIds(currentUser.likedArtistIds),
+        fetchPlaylistsForUser(user),
+        fetchSimpleArtistsByIds(user.likedArtistIds),
         fetchAllArtists(),
         fetchAllCollections(),
       ]);
-      
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      
-      // Use all collections from the system to correctly identify unreleased tracks
-      const allSystemAlbums = fetchedAllCollections.filter(p => p.collectionType === 'альбом');
-      const unreleasedTrackIds = new Set<string>();
-      allSystemAlbums.forEach(album => {
-        if (album.releaseDate && new Date(album.releaseDate) >= today) {
-          album.trackIds.forEach(tid => unreleasedTrackIds.add(tid));
-        }
-      });
-      
-      const releasedTracks = fetchedTracks.filter(track => !unreleasedTrackIds.has(track.id));
-      setTracks(releasedTracks);
+
+      setTracks(fetchedTracks);
       setAllArtists(fetchedAllArtists);
       setAllCollections(fetchedAllCollections);
+
+      const trackMap = new Map(fetchedTracks.map(t => [t.id, t]));
       
-      setFavoritesPlaylistId(favId);
+      const populatedPlaylists = fetchedPlaylistsData.playlists.map(p => ({
+          ...p,
+          tracks: p.trackIds.map(id => trackMap.get(id)).filter((t): t is Track => t !== undefined)
+      }));
+
+      const populatedLikedAlbums = fetchedPlaylistsData.likedAlbums.map(p => ({
+          ...p,
+          tracks: p.trackIds.map(id => trackMap.get(id)).filter((t): t is Track => t !== undefined)
+      }));
+
+      setPlaylists(populatedPlaylists);
+      setLikedAlbums(populatedLikedAlbums);
       setLikedArtists(fetchedLikedArtists);
-      
-      const populateCollectionTracks = (collection: Playlist) => ({
-        ...collection,
-        tracks: collection.trackIds.map(tid => fetchedTracks.find(t => t.id === tid)).filter((t): t is Track => t !== undefined),
-      });
+      setFavoritesPlaylistId(fetchedPlaylistsData.favoritesPlaylistId);
 
-      const playlistsWithTracks = fetchedPlaylists.map(p => ({
-        ...populateCollectionTracks(p),
-        isFavorites: p.id === favId,
-      })).sort((a, b) => (a.isFavorites === b.isFavorites) ? 0 : a.isFavorites ? -1 : 1);
-      
-      const likedAlbumsWithTracks = fetchedLikedAlbums.map(populateCollectionTracks);
+      const favoritesPlaylist = populatedPlaylists.find(p => p.id === fetchedPlaylistsData.favoritesPlaylistId);
+      if (favoritesPlaylist) {
+        const updatedUser = { ...user, likedTrackIds: favoritesPlaylist.trackIds };
+        setUser(updatedUser);
+        localStorage.setItem('joysicUser', JSON.stringify(updatedUser));
+      }
 
-      setPlaylists(playlistsWithTracks);
-      setLikedAlbums(likedAlbumsWithTracks);
-      setError(null);
-    } catch (err) {
-      setError('Failed to load data. Please check your connection and Airtable configuration.');
+    } catch (err: any) {
+      setError(err.message || 'Failed to load data.');
       console.error(err);
     } finally {
       setIsLoading(false);
     }
-  }, []);
-  
+  }, [user]);
+
   useEffect(() => {
-    if (user && tracks.length === 0) {
-      loadAppData(user);
+    if (user && !isAuthLoading) {
+      loadData();
     }
-  }, [user, tracks.length, loadAppData]);
+  }, [user, isAuthLoading, loadData]);
 
   useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-
-    if (currentTrack) {
-      if (audio.src !== currentTrack.audioUrl) {
-        audio.src = currentTrack.audioUrl;
-        audio.load();
+    if (currentTrack && audioRef.current) {
+      const currentSrc = audioRef.current.currentSrc;
+      const newSrc = currentTrack.audioUrl;
+      
+      if (!currentSrc || !currentSrc.endsWith(encodeURI(newSrc.substring(newSrc.lastIndexOf('/') + 1)))) {
+          audioRef.current.src = newSrc;
       }
       
       if (isPlaying) {
-        const playPromise = audio.play();
-        if (playPromise !== undefined) {
-            playPromise.catch(error => {
-                if (error.name !== 'AbortError') {
-                    console.error("Audio playback error:", error);
-                    setIsPlaying(false);
-                }
-            });
-        }
-      } else {
-        if (!audio.paused) {
-          audio.pause();
-        }
+        audioRef.current.play().catch(e => console.error("Error auto-playing track:", e));
       }
-      
-    } else {
-        audio.pause();
-        audio.src = '';
     }
   }, [currentTrack, isPlaying]);
+
+  useEffect(() => {
+      if (audioRef.current && currentTrack) {
+          if (isPlaying) {
+              audioRef.current.play().catch(e => console.error("Error playing audio:", e));
+          } else {
+              audioRef.current.pause();
+          }
+      }
+  }, [isPlaying, currentTrack?.id]);
+  
+  useEffect(() => {
+      if (scannedTrackId) {
+          playTrackById(scannedTrackId);
+          setScannedTrackId(null); // Reset after playing
+      }
+  }, [scannedTrackId, tracks]);
+
+  const playTrackById = (trackId: string, playlistContext?: Track[]) => {
+      const sourceTracks = playlistContext || tracks;
+      const trackIndex = sourceTracks.findIndex(t => t.id === trackId);
+      if (trackIndex !== -1) {
+          setShuffledTracks(sourceTracks);
+          setCurrentTrackIndex(trackIndex);
+          setIsPlaying(true);
+          setInitialSeekTime(0); // Start from beginning
+
+          // Increment listens count optimistically
+          const track = sourceTracks[trackIndex];
+          incrementTrackStats(track.id, 'Прослушивания', track.listens, 1).catch(err => console.error("Failed to increment listens", err));
+          // Update local state to reflect change immediately
+          setTracks(prev => prev.map(t => t.id === trackId ? {...t, listens: t.listens + 1} : t));
+      } else {
+          console.warn(`Track with id ${trackId} not found.`);
+      }
+  };
+
+  const handleSelectPlaylist = (playlist: Playlist) => {
+    const populatedPlaylist = {
+        ...playlist,
+        tracks: playlist.trackIds.map(id => tracks.find(t => t.id === id)).filter((t): t is Track => !!t)
+    };
+    setSelectedPlaylist(populatedPlaylist);
+    setView('playlistDetail');
+  };
+
+  const handleSelectArtistById = async (artistId: string) => {
+      setIsArtistLoading(true);
+      setView('artist');
+      try {
+          const artistDetails = await fetchArtistDetails(artistId);
+          setSelectedArtist(artistDetails);
+      } catch (error) {
+          console.error("Failed to fetch artist details", error);
+          setView('library'); // Go back if artist fails to load
+      } finally {
+          setIsArtistLoading(false);
+      }
+  };
+
+  const handlePlayPause = () => {
+    if (currentTrack) {
+      setIsPlaying(!isPlaying);
+    }
+  };
+
+  const handleNextTrack = useCallback(() => {
+    if (shuffledTracks.length > 0) {
+      setCurrentTrackIndex(prev => (prev === null ? 0 : (prev + 1) % shuffledTracks.length));
+      setIsPlaying(true);
+    }
+  }, [shuffledTracks.length]);
+
+  const handlePrevTrack = () => {
+    if (shuffledTracks.length > 0) {
+        if (audioRef.current && audioRef.current.currentTime > 3) {
+            audioRef.current.currentTime = 0;
+        } else {
+            setCurrentTrackIndex(prev => (prev === null ? 0 : (prev - 1 + shuffledTracks.length) % shuffledTracks.length));
+        }
+        setIsPlaying(true);
+    }
+  };
+
+  const handleSeek = (newTime: number) => {
+    if (audioRef.current) {
+      audioRef.current.currentTime = newTime;
+    }
+  };
+
+  const handleTimeUpdate = () => {
+    if (audioRef.current) {
+      setProgress({
+        currentTime: audioRef.current.currentTime,
+        duration: audioRef.current.duration,
+      });
+    }
+  };
+
+  const handleLoadedMetadata = () => {
+    if (audioRef.current) {
+      setProgress({
+        currentTime: 0,
+        duration: audioRef.current.duration,
+      });
+      if (initialSeekTime !== null) {
+        audioRef.current.currentTime = initialSeekTime;
+        setInitialSeekTime(null);
+      }
+    }
+  };
+
+  const handleToggleLike = async (type: 'track' | 'artist' | 'album', id: string) => {
+    if (!user) return;
+
+    let updatedUser: User = user;
+    let updates: { likedTrackIds?: string[], likedArtistIds?: string[], favoriteCollectionIds?: string[] } = {};
+
+    if (type === 'track') {
+        const isLiked = user.likedTrackIds.includes(id);
+        const newLikedTrackIds = isLiked ? user.likedTrackIds.filter(tid => tid !== id) : [...user.likedTrackIds, id];
+        updatedUser = { ...user, likedTrackIds: newLikedTrackIds };
+        updates.likedTrackIds = newLikedTrackIds;
+        
+        // Optimistically update like count
+        const track = tracks.find(t => t.id === id);
+        if (track) {
+            const newLikes = track.likes + (isLiked ? -1 : 1);
+            setTracks(prev => prev.map(t => t.id === id ? {...t, likes: newLikes} : t));
+            incrementTrackStats(id, 'Лайки', track.likes, isLiked ? -1 : 1).catch(err => console.error("Failed to update likes", err));
+        }
+
+    } else if (type === 'artist') {
+        const isLiked = user.likedArtistIds.includes(id);
+        const newLikedArtistIds = isLiked ? user.likedArtistIds.filter(aid => aid !== id) : [...user.likedArtistIds, id];
+        updatedUser = { ...user, likedArtistIds: newLikedArtistIds };
+        updates.likedArtistIds = newLikedArtistIds;
+        
+        // Optimistically update local state for liked artists
+        if (isLiked) {
+            setLikedArtists(prev => prev.filter(a => a.id !== id));
+        } else {
+            const artist = allArtists.find(a => a.id === id);
+            if (artist) setLikedArtists(prev => [...prev, artist]);
+        }
+
+    } else if (type === 'album') {
+        const isLiked = user.favoriteCollectionIds.includes(id);
+        const newFavoriteCollectionIds = isLiked ? user.favoriteCollectionIds.filter(cid => cid !== id) : [...user.favoriteCollectionIds, id];
+        updatedUser = { ...user, favoriteCollectionIds: newFavoriteCollectionIds };
+        updates.favoriteCollectionIds = newFavoriteCollectionIds;
+        
+        // Optimistically update local state for liked albums
+        if (isLiked) {
+            setLikedAlbums(prev => prev.filter(a => a.id !== id));
+        } else {
+            const album = allCollections.find(a => a.id === id);
+            if (album) setLikedAlbums(prev => [...prev, album]);
+        }
+    }
+
+    setUser(updatedUser);
+    localStorage.setItem('joysicUser', JSON.stringify(updatedUser));
+    await updateUserLikes(user, updates, favoritesPlaylistId).catch(err => {
+      console.error("Failed to sync likes", err);
+      // Revert optimistic update on failure
+      setUser(user);
+      localStorage.setItem('joysicUser', JSON.stringify(user));
+    });
+  };
+
+  const isCurrentTrackLiked = () => {
+      return !!user && !!currentTrack && user.likedTrackIds.includes(currentTrack.id);
+  };
+  
+  const handleToggleLikeCurrentTrack = () => {
+      if (currentTrack) {
+          handleToggleLike('track', currentTrack.id);
+      }
+  };
+
+  const handleShufflePlay = () => {
+    if (tracks.length > 0) {
+      const shuffled = [...tracks].sort(() => 0.5 - Math.random());
+      setShuffledTracks(shuffled);
+      setCurrentTrackIndex(0);
+      setIsPlaying(true);
+      setInitialSeekTime(0);
+    }
+  };
 
   const handleLogin = async (email: string, pass: string) => {
     const loggedInUser = await loginUser(email, pass);
     setUser(loggedInUser);
     localStorage.setItem('joysicUser', JSON.stringify(loggedInUser));
   };
-  
+
   const handleRegister = async (email: string, pass: string, name: string) => {
     const newUser = await registerUser(email, pass, name);
     setUser(newUser);
     localStorage.setItem('joysicUser', JSON.stringify(newUser));
   };
-
+  
   const handleLogout = () => {
-    setUser(null);
-    localStorage.removeItem('joysicUser');
-    setTracks([]);
-    setPlaylists([]);
-    setLikedAlbums([]);
-    setLikedArtists([]);
-    setAllArtists([]);
-    setAllCollections([]);
-    setShuffledTracks([]);
-    setCurrentTrackIndex(null);
-    setIsPlaying(false);
-    setView('library');
-    setFavoritesPlaylistId(undefined);
+      setUser(null);
+      localStorage.removeItem('joysicUser');
+      setTracks([]);
+      setPlaylists([]);
+      setCurrentTrackIndex(null);
+      setIsPlaying(false);
+      setView('library');
   };
 
-  const handleToggleLike = async (type: 'track' | 'artist' | 'album', id: string) => {
-    if (!user) return;
-
-    const originalUser = { ...user };
-    let updates: { likedTrackIds?: string[], likedArtistIds?: string[], favoriteCollectionIds?: string[] } = {};
-    let updatedUser: User;
-
-    if (type === 'track') {
-        const isLiked = user.likedTrackIds.includes(id);
-        const updatedLikedIds = isLiked ? user.likedTrackIds.filter(likedId => likedId !== id) : [...user.likedTrackIds, id];
-        updatedUser = { ...user, likedTrackIds: updatedLikedIds };
-        updates.likedTrackIds = updatedLikedIds;
-        
-        // Optimistic UI update for track likes
-        const trackToUpdate = tracks.find(t => t.id === id);
-        if (trackToUpdate) {
-            const newLikeCount = (trackToUpdate.likes || 0) + (isLiked ? -1 : 1);
-            const updatedTrack = { ...trackToUpdate, likes: newLikeCount };
-            const newTracks = tracks.map(t => t.id === id ? updatedTrack : t);
-            setTracks(newTracks);
-            const updateCollections = (collections: Playlist[]) => collections.map(p => ({
-                ...p,
-                tracks: p.tracks.map(t => t.id === id ? updatedTrack : t)
-            }));
-            setPlaylists(updateCollections);
-            setLikedAlbums(updateCollections);
-        }
-    } else if (type === 'artist') {
-        const isLiked = user.likedArtistIds.includes(id);
-        const updatedLikedIds = isLiked ? user.likedArtistIds.filter(likedId => likedId !== id) : [...user.likedArtistIds, id];
-        updatedUser = { ...user, likedArtistIds: updatedLikedIds };
-        updates.likedArtistIds = updatedLikedIds;
-    } else { // album
-        const isLiked = user.favoriteCollectionIds.includes(id);
-        const updatedCollectionIds = isLiked ? user.favoriteCollectionIds.filter(cid => cid !== id) : [...user.favoriteCollectionIds, id];
-        updatedUser = { ...user, favoriteCollectionIds: updatedCollectionIds };
-        updates.favoriteCollectionIds = updatedCollectionIds;
-        
-        // Optimistic UI update for album likes
-        if (isLiked) {
-          setLikedAlbums(prev => prev.filter(a => a.id !== id));
-        } else {
-          let albumToAdd: Playlist | undefined;
-          if (selectedArtist) {
-            albumToAdd = selectedArtist.albums.find(a => a.id === id);
-          }
-          if (!albumToAdd) {
-            const allCollections = [...playlists, ...likedAlbums];
-            albumToAdd = allCollections.find(c => c.id === id);
-          }
-          if (albumToAdd) {
-            setLikedAlbums(prev => [...prev, albumToAdd!]);
-          }
-        }
-    }
-
-    setUser(updatedUser);
-    localStorage.setItem('joysicUser', JSON.stringify(updatedUser));
-
-    try {
-      const promises: Promise<any>[] = [];
-      if (type === 'track') {
-          const trackToUpdate = tracks.find(t => t.id === id);
-          if (trackToUpdate) {
-            const isLiked = originalUser.likedTrackIds.includes(id);
-            promises.push(incrementTrackStats(id, 'Лайки', trackToUpdate.likes || 0, isLiked ? -1 : 1));
-          }
-      }
-      
-      await Promise.all([
-        ...promises,
-        updateUserLikes(user, updates, favoritesPlaylistId)
-      ]);
-
-      if (type === 'artist') {
-        // Re-fetch liked artists to update the library page
-        const fetchedLikedArtists = await fetchSimpleArtistsByIds(updatedUser.likedArtistIds);
-        setLikedArtists(fetchedLikedArtists);
-      }
-
-    } catch (error) {
-      console.error('Failed to update likes:', error);
-      setUser(originalUser);
-      localStorage.setItem('joysicUser', JSON.stringify(originalUser));
-      // Revert UI changes on failure
-      loadAppData(originalUser);
-    }
-  };
-
-  const handlePlayPause = useCallback(() => {
-    if (currentTrackIndex === null && shuffledTracks.length > 0) setCurrentTrackIndex(0);
-    setIsPlaying(prev => !prev);
-  }, [currentTrackIndex, shuffledTracks]);
-
-  const handleNextTrack = useCallback(() => {
-    if (shuffledTracks.length === 0) return;
-    setCurrentTrackIndex(prev => (prev === null || prev === shuffledTracks.length - 1) ? 0 : prev + 1);
-    setIsPlaying(true);
-  }, [shuffledTracks]);
-
-  const handlePrevTrack = useCallback(() => {
-    if (shuffledTracks.length === 0) return;
-    setCurrentTrackIndex(prev => (prev === null || prev === 0) ? shuffledTracks.length - 1 : prev - 1);
-    setIsPlaying(true);
-  }, [shuffledTracks]);
-
-  useEffect(() => {
-    const { mediaSession } = navigator;
-    if (!mediaSession) return;
-
-    if (currentTrack) {
-      mediaSession.metadata = new window.MediaMetadata({
-        title: currentTrack.title,
-        artist: currentTrack.artists.map(a => a.name).join(', '),
-        album: 'Joysic',
-        artwork: currentTrack.artwork,
-      });
-      mediaSession.setActionHandler('play', handlePlayPause);
-      mediaSession.setActionHandler('pause', handlePlayPause);
-      mediaSession.setActionHandler('previoustrack', handlePrevTrack);
-      mediaSession.setActionHandler('nexttrack', handleNextTrack);
-    }
-    
-    return () => {
-      mediaSession.setActionHandler('play', null);
-      mediaSession.setActionHandler('pause', null);
-      mediaSession.setActionHandler('previoustrack', null);
-      mediaSession.setActionHandler('nexttrack', null);
-    };
-  }, [currentTrack, handlePlayPause, handlePrevTrack, handleNextTrack]);
-
-  useEffect(() => {
-    const { mediaSession } = navigator;
-    if (!mediaSession) return;
-    mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
-  }, [isPlaying]);
-  
-  const handleTimeUpdate = () => {
-    if (audioRef.current) setProgress({ currentTime: audioRef.current.currentTime, duration: audioRef.current.duration || 0 });
-  };
-
-  const handleLoadedData = () => {
-    handleTimeUpdate();
-    if (initialSeekTime !== null && audioRef.current) {
-        audioRef.current.currentTime = initialSeekTime;
-        setInitialSeekTime(null);
-    }
-  };
-  
-  const handleSeek = (newTime: number) => {
-    if (audioRef.current) audioRef.current.currentTime = newTime;
-  };
-
-  const handleSelectArtist = useCallback(async (artistId: string) => {
-    setIsArtistLoading(true);
-    setView('artist');
-    setIsPlayerExpanded(false);
-    try {
-      const artistDetails = await fetchArtistDetails(artistId);
-      // Populate artist tracks with full track data from state for accurate stats
-      artistDetails.tracks = artistDetails.tracks.map(t => tracks.find(fullTrack => fullTrack.id === t.id) || t);
-      artistDetails.albums.forEach(album => {
-        album.tracks = album.tracks.map(t => tracks.find(fullTrack => fullTrack.id === t.id) || t);
-      });
-      setSelectedArtist(artistDetails);
-    } catch (err) {
-      setError(`Failed to load artist details.`);
-      console.error(err);
-    } finally {
-      setIsArtistLoading(false);
-    }
-  }, [tracks]);
-
-  const handlePlayTrack = useCallback((trackId: string, trackList: Track[]) => {
-    const newIndex = trackList.findIndex(t => t.id === trackId);
-    if (newIndex !== -1) {
-      const newShuffledList = [...trackList];
-      const currentTrackInNewList = newShuffledList[newIndex];
-      newShuffledList.splice(newIndex, 1);
-      newShuffledList.sort(() => Math.random() - 0.5);
-      newShuffledList.unshift(currentTrackInNewList);
-      
-      setShuffledTracks(newShuffledList);
-
-      const isSameTrack = currentTrack?.id === trackId;
-      if (isSameTrack) {
-        handlePlayPause();
-      } else {
-        setCurrentTrackIndex(0);
-        setIsPlaying(true);
-        
-        // Increment listen count
-        const trackToUpdate = tracks.find(t => t.id === trackId);
-        if (trackToUpdate) {
-            const updatedTrack = { ...trackToUpdate, listens: (trackToUpdate.listens || 0) + 1 };
-            const newTracks = tracks.map(t => t.id === trackId ? updatedTrack : t);
-            setTracks(newTracks);
-
-            const updateCollections = (collections: Playlist[]) => collections.map(p => ({
-                ...p,
-                tracks: p.tracks.map(t => t.id === trackId ? updatedTrack : t)
-            }));
-            setPlaylists(updateCollections);
-            setLikedAlbums(updateCollections);
-
-            incrementTrackStats(trackId, 'Прослушивания', trackToUpdate.listens || 0).catch(err => {
-                console.error("Failed to update listen count:", err);
-            });
-        }
-      }
-    }
-    setIsPlayerExpanded(false);
-  }, [currentTrack, handlePlayPause, tracks]);
-  
-  const handleScanSuccess = useCallback((trackId: string) => {
-    setScannedTrackId(trackId);
-    setIsScannerOpen(false);
-  }, []);
-
-  useEffect(() => {
-    if (scannedTrackId) {
-      const trackExists = tracks.some(t => t.id === scannedTrackId);
+  const handleScanSuccess = (decodedText: string) => {
+      setIsScannerOpen(false);
+      const trackExists = tracks.some(t => t.id === decodedText);
       if (trackExists) {
-        handlePlayTrack(scannedTrackId, tracks);
-        setIsPlayerExpanded(true);
+          setScannedTrackId(decodedText);
       } else {
-        console.warn(`Track with ID ${scannedTrackId} not found from scan.`);
+          alert("Отсканированный трек не найден в медиатеке.");
       }
-      setScannedTrackId(null); // Reset after handling
-    }
-  }, [scannedTrackId, tracks, handlePlayTrack]);
-
-  const handleSelectPlaylist = useCallback((playlist: Playlist) => {
-    // Ensure playlist tracks have the latest stats
-    const updatedPlaylist = {
-      ...playlist,
-      tracks: playlist.trackIds.map(tid => tracks.find(t => t.id === tid)).filter((t): t is Track => !!t)
-    };
-    setSelectedPlaylist(updatedPlaylist);
-    setView('playlistDetail');
-  }, [tracks]);
-
-  const handleShufflePlayAll = () => {
-    if (tracks.length === 0) return;
-    const shuffled = [...tracks].sort(() => Math.random() - 0.5);
-    setShuffledTracks(shuffled);
-    setCurrentTrackIndex(0);
-    setIsPlaying(true);
   };
+  
+  if (isCheckingBeta) {
+    return <SplashScreen />;
+  }
 
-  const handleNavigateToProfile = useCallback(() => setView('profile'), []);
-  const handleOpenScanner = useCallback(() => setIsScannerOpen(true), []);
-  const handleOpenMatInfo = useCallback(() => setIsMatInfoModalOpen(true), []);
+  if (isBetaLocked) {
+    return <BetaLockScreen imageUrl={betaImageUrl} />;
+  }
 
-  const handleExpandPlayer = () => setIsPlayerExpanded(true);
-  const handleMinimizePlayer = () => setIsPlayerExpanded(false);
+  if (isAuthLoading) {
+    return <SplashScreen />;
+  }
+  
+  if (!user) {
+    return <AuthPage onLogin={handleLogin} onRegister={handleRegister} />;
+  }
 
-  if (isCheckingBeta) return <SplashScreen />;
-  if (isBetaLocked) return <BetaLockScreen imageUrl={betaImageUrl} />;
-  if (isAuthLoading) return <SplashScreen />;
-  if (!user) return <AuthPage onLogin={handleLogin} onRegister={handleRegister} />;
-  if (isLoading) return <SplashScreen />;
-  if (error) return <div className="min-h-screen bg-background text-text flex justify-center items-center p-4"><p className="text-center text-red-400 bg-red-500/10 p-4 rounded-lg">{error}</p></div>;
-
-  const mainContent = () => {
-    switch(view) {
-        case 'profile':
-            return <ProfilePage 
-                user={user}
-                stats={{
-                    likedTracksCount: user.likedTrackIds.length,
-                    likedArtistsCount: user.likedArtistIds.length,
-                    likedAlbumsCount: likedAlbums.length,
-                }}
-                onBack={() => setView('library')}
-                onLogout={handleLogout}
-            />;
-        case 'artist':
-            return isArtistLoading || !selectedArtist ? (
-                <div className="min-h-screen flex justify-center items-center"><div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-surface-light"></div></div>
-            ) : (
-                <ArtistPage 
-                    artist={selectedArtist} 
-                    onBack={() => setView('library')}
-                    onPlayTrack={(trackId) => handlePlayTrack(trackId, selectedArtist.tracks)}
-                    currentTrackId={currentTrack?.id}
-                    isPlaying={isPlaying}
-                    likedArtistIds={user.likedArtistIds}
-                    onSelectPlaylist={handleSelectPlaylist}
-                    likedTrackIds={user.likedTrackIds}
-                    favoriteCollectionIds={user.favoriteCollectionIds}
-                    onToggleLike={handleToggleLike}
-                    onOpenMatInfo={handleOpenMatInfo}
-                />
-            );
-        case 'playlistDetail':
-            return selectedPlaylist && (
-                <PlaylistDetailPage 
-                    playlist={selectedPlaylist}
-                    onBack={() => setView('library')}
-                    onPlayTrack={(trackId) => handlePlayTrack(trackId, selectedPlaylist.tracks)}
-                    currentTrackId={currentTrack?.id}
-                    isPlaying={isPlaying}
-                    onPlayPause={handlePlayPause}
-                    likedTrackIds={user.likedTrackIds}
-                    favoriteCollectionIds={user.favoriteCollectionIds}
-                    onToggleLike={handleToggleLike}
-                    onOpenMatInfo={handleOpenMatInfo}
-                />
-            );
-        case 'library':
-        default:
-            return <LibraryPage 
-                user={user} 
-                playlists={playlists} 
-                likedAlbums={likedAlbums} 
-                likedArtists={likedArtists}
-                tracks={tracks}
-                allArtists={allArtists}
-                allCollections={allCollections}
-                onSelectPlaylist={handleSelectPlaylist} 
-                onSelectArtist={handleSelectArtist}
-                onPlayTrack={(trackId) => handlePlayTrack(trackId, tracks)}
-                onShufflePlayAll={handleShufflePlayAll} 
-                onNavigateToProfile={handleNavigateToProfile}
-                onOpenScanner={handleOpenScanner}
-                currentTrackId={currentTrack?.id}
-                isPlaying={isPlaying}
-                onOpenMatInfo={handleOpenMatInfo}
-            />;
-    }
+  if (isLoading && !tracks.length) {
+    return <SplashScreen />;
   }
 
   return (
-    <div className="min-h-screen bg-background text-text font-sans">
-      <main className={`transition-all duration-500 ${currentTrack ? 'pb-20' : ''}`}>
-        {mainContent()}
+    <div className="bg-background min-h-screen font-sans text-text">
+      <main className={`transition-all duration-500 ease-in-out ${currentTrack ? 'pb-20' : ''}`}>
+        {view === 'library' && (
+          <LibraryPage
+            user={user}
+            playlists={playlists}
+            likedAlbums={likedAlbums}
+            likedArtists={likedArtists}
+            tracks={tracks}
+            allArtists={allArtists}
+            allCollections={allCollections}
+            onSelectPlaylist={handleSelectPlaylist}
+            onSelectArtist={handleSelectArtistById}
+            onPlayTrack={playTrackById}
+            onShufflePlayAll={handleShufflePlay}
+            onNavigateToProfile={() => setView('profile')}
+            onOpenScanner={() => setIsScannerOpen(true)}
+            currentTrackId={currentTrack?.id}
+            isPlaying={isPlaying}
+            onOpenMatInfo={() => setIsMatInfoModalOpen(true)}
+          />
+        )}
+        {view === 'artist' && selectedArtist && !isArtistLoading && (
+          <ArtistPage
+            artist={selectedArtist}
+            onBack={() => setView('library')}
+            onPlayTrack={(trackId) => playTrackById(trackId, selectedArtist.tracks)}
+            onSelectPlaylist={handleSelectPlaylist}
+            currentTrackId={currentTrack?.id}
+            isPlaying={isPlaying}
+            likedArtistIds={user.likedArtistIds}
+            likedTrackIds={user.likedTrackIds}
+            favoriteCollectionIds={user.favoriteCollectionIds}
+            onToggleLike={handleToggleLike}
+            onOpenMatInfo={() => setIsMatInfoModalOpen(true)}
+          />
+        )}
+        {view === 'playlistDetail' && selectedPlaylist && (
+          <PlaylistDetailPage
+            playlist={selectedPlaylist}
+            onBack={() => setView('library')}
+            onPlayTrack={(trackId) => playTrackById(trackId, selectedPlaylist.tracks)}
+            currentTrackId={currentTrack?.id}
+            isPlaying={isPlaying}
+            onPlayPause={handlePlayPause}
+            likedTrackIds={user.likedTrackIds}
+            favoriteCollectionIds={user.favoriteCollectionIds}
+            onToggleLike={handleToggleLike}
+            onOpenMatInfo={() => setIsMatInfoModalOpen(true)}
+          />
+        )}
+        {view === 'profile' && (
+          <ProfilePage
+            user={user}
+            stats={{
+              likedTracksCount: user.likedTrackIds.length,
+              likedArtistsCount: user.likedArtistIds.length,
+              likedAlbumsCount: likedAlbums.length,
+            }}
+            onBack={() => setView('library')}
+            onLogout={handleLogout}
+          />
+        )}
       </main>
 
-      {currentTrack && user && (
-        <>
-          <div className={`fixed z-50 inset-0 transition-transform duration-700 ease-in-out ${isPlayerExpanded ? 'translate-y-0' : 'translate-y-full'}`}>
+      {currentTrack && (
+        isPlayerExpanded ? (
+          <div className="fixed inset-0 z-50 animate-fadeInScaleUp">
             <Player
               track={currentTrack}
               isPlaying={isPlaying}
               progress={progress}
+              isLiked={isCurrentTrackLiked()}
               onPlayPause={handlePlayPause}
               onNext={handleNextTrack}
               onPrev={handlePrevTrack}
               onSeek={handleSeek}
-              onSelectArtist={handleSelectArtist}
-              onMinimize={handleMinimizePlayer}
-              isLiked={user.likedTrackIds.includes(currentTrack.id)}
-              onToggleLike={() => handleToggleLike('track', currentTrack.id)}
-              onOpenMatInfo={handleOpenMatInfo}
+              onSelectArtist={handleSelectArtistById}
+              onMinimize={() => setIsPlayerExpanded(false)}
+              onToggleLike={handleToggleLikeCurrentTrack}
+              onOpenMatInfo={() => setIsMatInfoModalOpen(true)}
             />
           </div>
-          <div className={`fixed bottom-0 left-0 right-0 z-40 transition-transform duration-500 ease-in-out ${isPlayerExpanded ? 'translate-y-full' : 'translate-y-0'}`}>
-             <MiniPlayer track={currentTrack} isPlaying={isPlaying} onPlayPause={handlePlayPause} onExpand={handleExpandPlayer} progress={progress.duration > 0 ? (progress.currentTime / progress.duration) * 100 : 0}/>
+        ) : (
+          <div className="fixed bottom-0 left-0 right-0 z-40 animate-fadeInScaleUp">
+            <MiniPlayer
+              track={currentTrack}
+              isPlaying={isPlaying}
+              progress={(progress.duration > 0) ? (progress.currentTime / progress.duration) * 100 : 0}
+              onPlayPause={handlePlayPause}
+              onExpand={() => setIsPlayerExpanded(true)}
+            />
           </div>
-        </>
+        )
+      )}
+
+      {isScannerOpen && (
+        <ScannerModal
+          onClose={() => setIsScannerOpen(false)}
+          onScanSuccess={handleScanSuccess}
+        />
       )}
       
-      {isScannerOpen && <ScannerModal onClose={() => setIsScannerOpen(false)} onScanSuccess={handleScanSuccess} />}
-      {isMatInfoModalOpen && <MatInfoModal onClose={() => setIsMatInfoModalOpen(false)} />}
+      {isMatInfoModalOpen && (
+        <MatInfoModal onClose={() => setIsMatInfoModalOpen(false)} />
+      )}
 
-      <audio ref={audioRef} onTimeUpdate={handleTimeUpdate} onLoadedData={handleLoadedData} onEnded={handleNextTrack} className="hidden"/>
+      <audio
+        ref={audioRef}
+        onTimeUpdate={handleTimeUpdate}
+        onLoadedMetadata={handleLoadedMetadata}
+        onEnded={handleNextTrack}
+        onPlay={() => setIsPlaying(true)}
+        onPause={() => setIsPlaying(false)}
+        onError={(e) => console.error("Audio Error:", e)}
+        crossOrigin="anonymous"
+      />
     </div>
   );
 };
 
+// FIX: Added a default export for the App component.
 export default App;

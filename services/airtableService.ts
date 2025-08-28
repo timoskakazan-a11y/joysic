@@ -1,569 +1,467 @@
 
+import type { Track, Artist, User, Playlist, Artwork, SimpleArtist } from '../types';
 
-import type { Track, Artist, AirtableTrackRecord, AirtableArtistRecord, User, AirtableUserRecord, Playlist, AirtablePlaylistRecord, Artwork, AirtableAttachment, SimpleArtist } from '../types';
+// =================================================================================
+// ВНИМАНИЕ: По вашему требованию, эта версия кода выполняет прямые запросы 
+// к API Notion из браузера. Этот подход НЕ РЕКОМЕНДУЕТСЯ, так как:
+// 1. Ваш секретный API-ключ виден любому, кто откроет код сайта.
+// 2. Браузеры почти наверняка заблокируют эти запросы из-за политики
+//    безопасности CORS, что приведет к ошибке "Failed to fetch".
+// =================================================================================
 
-const AIRTABLE_BASE_ID = 'appuGObKAO57IqWRN';
-const MUSIC_TABLE_NAME = 'music';
-const ARTISTS_TABLE_NAME = 'исполнители';
-const USERS_TABLE_NAME = 'пользователи';
-const PLAYLISTS_TABLE_NAME = 'плейлисты';
-const PHOTOS_TABLE_NAME = 'Фото';
-const AIRTABLE_API_KEY = 'patZi9FoyhVvaJGnt.fdefebefbc59c7f41ff1bbf09d80f9a2da8f35dcc24c98e9766dba336053487d';
+const NOTION_API_KEY = 'secret_n688DxMZicBXMyTkkN1AWCMQwcPPraWdFb4HLLW8pzh';
+const NOTION_API_VERSION = '2022-06-28';
+const NOTION_BASE_URL = 'https://api.notion.com/v1';
 
-const fetchFromAirtable = async (tableName: string, options: RequestInit = {}, path: string = '') => {
-  const API_URL = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(tableName)}${path}`;
-  const response = await fetch(API_URL, {
-    ...options,
-    headers: {
-      'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-  });
+// ВАЖНО: Укажите здесь настоящие ID ваших баз данных Notion.
+const MUSIC_DATABASE_ID = '25d0d1b6cd918059a82accc1c0675eea';
+const ARTISTS_DATABASE_ID = '25d0d1b6cd918062a52ecc5004fee897';
+const USERS_DATABASE_ID = '25d0d1b6cd91800babc2c0650dfa49b9';
+const PLAYLISTS_DATABASE_ID = '25d0d1b6cd9180de8014e3e84cebc0a3';
+const PHOTOS_DATABASE_ID = '25d0d1b6cd91809598c3d34307782169';
 
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(`Airtable API error (table: ${tableName}): ${errorData.error && errorData.error.message || response.statusText}`);
+const fetchFromNotion = async (endpoint: string, options: RequestInit = {}) => {
+  const url = `${NOTION_BASE_URL}${endpoint}`;
+  const headers = {
+    'Authorization': `Bearer ${NOTION_API_KEY}`,
+    'Notion-Version': NOTION_API_VERSION,
+    'Content-Type': 'application/json',
+    ...(options.headers || {}),
+  };
+
+  try {
+    const response = await fetch(url, { ...options, headers });
+    
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Failed to parse error response from Notion' }));
+        console.error('Error from Notion API:', errorData);
+        throw new Error(errorData.message || `Ошибка API Notion (${response.status})`);
+    }
+    return response.json();
+
+  } catch (error: any) {
+    console.error(`Error during fetchFromNotion for endpoint [${endpoint}]:`, error);
+    // Эта ошибка, скорее всего, будет вызвана CORS
+    if (error instanceof TypeError && error.message === 'Failed to fetch') {
+        throw new Error('Сетевая ошибка или CORS. Браузер заблокировал прямой запрос к API Notion. Это ожидаемое поведение. Для решения проблемы требуется серверный прокси.');
+    }
+    throw new Error(error.message || `Произошла неизвестная сетевая ошибка.`);
   }
-
-  return response.json();
 };
 
-const mapAirtableRecordToUser = (record: AirtableUserRecord): User => {
-    return {
-        id: record.id,
-        email: record.fields['Почта'],
-        name: record.fields['Имя'],
-        likedTrackIds: record.fields['Лайки песен'] || [],
-        likedArtistIds: record.fields['Любимые исполнители'] || [],
-        favoriteCollectionIds: record.fields['Любимый плейлист'] || [],
-        avatarUrl: record.fields['Аватар']?.[0]?.url,
-        totalListeningMinutes: parseInt(record.fields['Время прослушивания'] || '0', 10) || 0,
-    };
-};
 
-export const fetchMediaUrl = async (name: string): Promise<string | null> => {
-    const formula = `{Название} = '${name}'`;
-    try {
-        const response = await fetchFromAirtable(PHOTOS_TABLE_NAME, {}, `?filterByFormula=${encodeURIComponent(formula)}`);
-        if (response.records && response.records.length > 0 && response.records[0].fields['Фото']?.[0]?.url) {
-            return response.records[0].fields['Фото'][0].url;
+const queryDatabase = async (databaseId: string, body: any = {}): Promise<any[]> => {
+    let results: any[] = [];
+    let has_more = true;
+    let start_cursor: string | undefined = undefined;
+
+    const requestBody = { ...body };
+
+    while (has_more) {
+        if (start_cursor) {
+            requestBody.start_cursor = start_cursor;
         }
+
+        const response = await fetchFromNotion(`/databases/${databaseId}/query`, {
+            method: 'POST',
+            body: JSON.stringify(requestBody),
+        });
+        
+        if (response && response.results) {
+          results = results.concat(response.results);
+          has_more = response.has_more;
+          start_cursor = response.next_cursor;
+        } else {
+          has_more = false;
+        }
+    }
+    return results;
+};
+
+const fetchPage = (pageId: string) => fetchFromNotion(`/pages/${pageId}`, { method: 'GET' });
+const createPage = (body: any) => fetchFromNotion('/pages', { method: 'POST', body: JSON.stringify({ ...body }) });
+const updatePage = (pageId: string, body: any) => fetchFromNotion(`/pages/${pageId}`, { method: 'PATCH', body: JSON.stringify({ ...body }) });
+
+// --- Notion Property Extractor Helpers ---
+const getTitle = (page: any, propName: string): string => page.properties[propName]?.title[0]?.plain_text || '';
+const getRichText = (page: any, propName: string): string => page.properties[propName]?.rich_text[0]?.plain_text || '';
+const getNumber = (page: any, propName: string): number => page.properties[propName]?.number || 0;
+const getCheckbox = (page: any, propName: string): boolean => page.properties[propName]?.checkbox || false;
+const getUrl = (page: any, propName: string): string | undefined => page.properties[propName]?.url || undefined;
+const getRelationIds = (page: any, propName: string): string[] => (page.properties[propName]?.relation || []).map((r: any) => r.id);
+const getFiles = (page: any, propName: string): any[] => page.properties[propName]?.files || [];
+const getEmail = (page: any, propName: string): string => page.properties[propName]?.email || '';
+const getFileUrl = (page: any, propName: string): string | undefined => {
+    const file = getFiles(page, propName)[0];
+    if (!file) return undefined;
+    return file.type === 'external' ? file.external.url : file.file.url;
+};
+const getSelect = (page: any, propName: string): string | undefined => page.properties[propName]?.select?.name;
+const getDate = (page: any, propName: string): string | undefined => page.properties[propName]?.date?.start;
+
+
+// --- Mappers from Notion Page to App Types ---
+const mapNotionPageToUser = (page: any): User => ({
+    id: page.id,
+    email: getEmail(page, 'Почта'),
+    name: getTitle(page, 'Имя'),
+    likedTrackIds: getRelationIds(page, 'Лайки песен'),
+    likedArtistIds: getRelationIds(page, 'Любимые исполнители'),
+    favoriteCollectionIds: getRelationIds(page, 'Любимый плейлист'),
+    avatarUrl: getFileUrl(page, 'Аватар'),
+    totalListeningMinutes: getNumber(page, 'Время прослушивания'),
+});
+
+const mapNotionPageToSimpleArtist = (page: any): SimpleArtist => ({
+    id: page.id,
+    name: getTitle(page, 'Имя'),
+    photoUrl: getFileUrl(page, 'Фото'),
+});
+
+const mapNotionPageToTrack = (page: any, artistMap: Map<string, SimpleArtist>): Track | null => {
+    try {
+        const title = getTitle(page, 'Название');
+        const audioUrl = getFileUrl(page, 'Аудио');
+        const coverFile = getFiles(page, 'Обложка трека')[0];
+        const artistIds = getRelationIds(page, 'Исполнитель');
+
+        if (!title || !audioUrl || !coverFile || artistIds.length === 0) {
+            console.warn(`Skipping track with ID ${page.id} due to missing essential data (title, audio, cover, or artist).`);
+            return null;
+        }
+
+        const artists: SimpleArtist[] = artistIds
+            .map(id => artistMap.get(id))
+            .filter((a): a is SimpleArtist => a !== undefined);
+        
+        if (artists.length === 0) {
+            console.warn(`Skipping track "${title}" (ID: ${page.id}) because its linked artist could not be found.`);
+            return null;
+        }
+
+        const coverUrl = coverFile.type === 'external' ? coverFile.external.url : coverFile.file.url;
+        const coverUrlType = coverFile.type;
+
+        return {
+            id: page.id,
+            title,
+            artists,
+            lyrics: getRichText(page, 'Слова'),
+            audioUrl,
+            artwork: [{ src: coverUrl, sizes: '512x512', type: 'image/jpeg' }], // Placeholder artwork
+            coverUrl,
+            coverUrlType,
+            likes: getNumber(page, 'Лайки'),
+            listens: getNumber(page, 'Прослушивания'),
+            youtubeClipUrl: getUrl(page, 'клип'),
+            mat: getCheckbox(page, 'МАТ'),
+        };
     } catch (error) {
-        console.error(`Error fetching media '${name}' from Airtable:`, error);
-    }
-    return null;
-};
-
-export const loginUser = async (email: string, password: string): Promise<User> => {
-    const formula = `AND({Почта} = '${email}', {Пароль} = '${password}')`;
-    const response = await fetchFromAirtable(USERS_TABLE_NAME, {
-        method: 'GET'
-    }, `?filterByFormula=${encodeURIComponent(formula)}`);
-
-    if (!response.records || response.records.length === 0) {
-        throw new Error('Неверный email или пароль');
-    }
-    return mapAirtableRecordToUser(response.records[0]);
-};
-
-export const registerUser = async (email: string, password: string, name: string): Promise<User> => {
-    // 1. Check if user already exists
-    const checkFormula = `{Почта} = '${email}'`;
-    const checkResponse = await fetchFromAirtable(USERS_TABLE_NAME, {}, `?filterByFormula=${encodeURIComponent(checkFormula)}`);
-    if (checkResponse.records && checkResponse.records.length > 0) {
-        throw new Error('Пользователь с таким email уже существует');
-    }
-    
-    // Fetch default avatar
-    const defaultAvatarUrl = await fetchMediaUrl('Аватар стандартный') || 'https://i.postimg.cc/G3K2BYkT/joysic.png';
-
-    // 2. Create user record
-    const userCreateResponse = await fetchFromAirtable(USERS_TABLE_NAME, {
-        method: 'POST',
-        body: JSON.stringify({
-            records: [{ fields: { 
-                'Почта': email, 
-                'Пароль': password, 
-                'Имя': name,
-                'Аватар': [{ url: defaultAvatarUrl }]
-            } }]
-        })
-    });
-
-    if (!userCreateResponse.records || userCreateResponse.records.length === 0) {
-        throw new Error('Не удалось создать пользователя.');
-    }
-    const newUserId = userCreateResponse.records[0].id;
-
-    // Fetch cover photo for "Любимое" playlist from the "Фото" table
-    const photoFormula = `{Название} = 'Любимое плейлист'`;
-    const photoResponse = await fetchFromAirtable(PHOTOS_TABLE_NAME, {}, `?filterByFormula=${encodeURIComponent(photoFormula)}`);
-    
-    // Use the fetched URL, or a fallback if not found
-    let coverUrl = 'https://i.postimg.cc/FKncyR8c/24d35647-7d57-43ae-8dd6-82e5f299ecc7.png'; // Fallback
-    if (photoResponse.records && photoResponse.records.length > 0 && photoResponse.records[0].fields['Фото']?.[0]?.url) {
-        coverUrl = photoResponse.records[0].fields['Фото'][0].url;
-    }
-
-    // 3. Create "Любимое" playlist
-    const playlistCreateResponse = await fetchFromAirtable(PLAYLISTS_TABLE_NAME, {
-        method: 'POST',
-        body: JSON.stringify({
-            records: [{
-                fields: {
-                    'Название': 'Любимое',
-                    'Описание': 'Ваши любимые треки',
-                    'Обложка': [{ url: coverUrl }],
-                    'пользователи': [newUserId],
-                    'Тип': 'встроенный',
-                    'Альбом/Плейлист': 'плейлист'
-                }
-            }]
-        })
-    });
-
-    if (!playlistCreateResponse.records || playlistCreateResponse.records.length === 0) {
-        // In a real app, we should delete the created user here for transactional integrity.
-        throw new Error('Не удалось создать плейлист "Любимое".');
-    }
-    const newPlaylistId = playlistCreateResponse.records[0].id;
-
-    // Link user to the shared "Новые артисты" playlist
-    try {
-        const newArtistsPlaylistFormula = `{Название} = 'Новые артисты'`;
-        const newArtistsPlaylistResponse = await fetchFromAirtable(PLAYLISTS_TABLE_NAME, {}, `?filterByFormula=${encodeURIComponent(newArtistsPlaylistFormula)}`);
-
-        if (newArtistsPlaylistResponse.records && newArtistsPlaylistResponse.records.length > 0) {
-            const playlistRecord = newArtistsPlaylistResponse.records[0];
-            const playlistId = playlistRecord.id;
-            const existingUsers = playlistRecord.fields['пользователи'] || [];
-            
-            const updatedUsers = [...new Set([...existingUsers, newUserId])];
-            
-            await fetchFromAirtable(PLAYLISTS_TABLE_NAME, {
-                method: 'PATCH',
-                body: JSON.stringify({
-                    records: [{
-                        id: playlistId,
-                        fields: { 'пользователи': updatedUsers }
-                    }]
-                })
-            });
-        }
-    } catch (e) {
-        console.error('Failed to link new user to "Новые артисты" playlist:', e);
-        // Do not block registration for this optional step
-    }
-
-    // 4. Update user with the ID of the new "Любимое" playlist
-    await fetchFromAirtable(USERS_TABLE_NAME, {
-        method: 'PATCH',
-        body: JSON.stringify({
-            records: [{
-                id: newUserId,
-                fields: { 'Любимый плейлист': [newPlaylistId] }
-            }]
-        })
-    });
-
-    // 5. Fetch the full, updated user record to ensure all data is present for the app state
-    const fullUserRecord = await fetchFromAirtable(USERS_TABLE_NAME, {}, `/${newUserId}`);
-    if (!fullUserRecord) {
-        throw new Error('Не удалось получить данные нового пользователя после регистрации.');
-    }
-    
-    return mapAirtableRecordToUser(fullUserRecord);
-};
-
-export const updateUserLikes = async (user: User, updates: { likedTrackIds?: string[], likedArtistIds?: string[], favoriteCollectionIds?: string[] }, favoritesPlaylistId?: string | null): Promise<void> => {
-    const fieldsToUpdate: { [key: string]: string[] } = {};
-
-    if (updates.likedTrackIds !== undefined) fieldsToUpdate['Лайки песен'] = updates.likedTrackIds;
-    if (updates.likedArtistIds !== undefined) fieldsToUpdate['Любимые исполнители'] = updates.likedArtistIds;
-    if (updates.favoriteCollectionIds !== undefined) fieldsToUpdate['Любимый плейлист'] = updates.favoriteCollectionIds;
-
-    const promises: Promise<any>[] = [];
-
-    if (Object.keys(fieldsToUpdate).length > 0) {
-        promises.push(fetchFromAirtable(USERS_TABLE_NAME, {
-            method: 'PATCH',
-            body: JSON.stringify({
-                records: [{
-                    id: user.id,
-                    fields: fieldsToUpdate
-                }]
-            })
-        }));
-    }
-
-    if (updates.likedTrackIds && favoritesPlaylistId) {
-        promises.push(fetchFromAirtable(PLAYLISTS_TABLE_NAME, {
-            method: 'PATCH',
-            body: JSON.stringify({
-                records: [{
-                    id: favoritesPlaylistId,
-                    fields: { 'Песни': updates.likedTrackIds }
-                }]
-            })
-        }));
-    }
-
-    await Promise.all(promises);
-};
-
-
-export const incrementTrackStats = async (trackId: string, field: 'Лайки' | 'Прослушивания', currentValue: number, increment: number = 1): Promise<void> => {
-    await fetchFromAirtable(MUSIC_TABLE_NAME, {
-        method: 'PATCH',
-        body: JSON.stringify({
-            records: [{
-                id: trackId,
-                fields: {
-                    [field]: currentValue + increment
-                }
-            }]
-        })
-    });
-};
-
-export const updateUserListeningTime = async (userId: string, totalMinutes: number): Promise<void> => {
-    const fieldsToUpdate = {
-        'Время прослушивания': String(totalMinutes),
-    };
-
-    await fetchFromAirtable(USERS_TABLE_NAME, {
-        method: 'PATCH',
-        body: JSON.stringify({
-            records: [{
-                id: userId,
-                fields: fieldsToUpdate,
-            }],
-        }),
-    });
-};
-
-
-const mapAirtableRecordToTrack = (record: AirtableTrackRecord, artistMap: Map<string, SimpleArtist>): Track | null => {
-    const fields = record.fields;
-    const coverAttachment = fields['Обложка трека']?.[0];
-    const artistIds = fields['Исполнитель'] || [];
-
-    if (!fields['Название'] || !(fields['Аудио']?.[0]?.url) || !coverAttachment?.url || artistIds.length === 0) {
+        console.error(`Error mapping track with ID ${page.id}:`, error);
         return null;
     }
+};
 
-    const artists: SimpleArtist[] = artistIds
-        .map(id => artistMap.get(id))
-        .filter((artist): artist is SimpleArtist => !!artist);
-    
-    if (artists.length === 0) {
-        return null; // A track must have at least one valid artist
-    }
-    
-    const coverUrlType = coverAttachment.type || 'image/jpeg';
-    
-    const artwork: Artwork[] = [];
+const mapNotionPageToPlaylist = (page: any): Playlist | null => {
+    try {
+        const name = getTitle(page, 'Название');
+        const coverFile = getFiles(page, 'Обложка')[0];
+        if (!name || !coverFile) {
+            console.warn(`Skipping playlist with ID ${page.id} due to missing name or cover.`);
+            return null;
+        }
 
-    if (coverAttachment.thumbnails?.large) {
-        artwork.push({
-            src: coverAttachment.thumbnails.large.url,
-            sizes: `${coverAttachment.thumbnails.large.width}x${coverAttachment.thumbnails.large.height}`,
-            type: coverUrlType
-        });
-    }
-    if (coverAttachment.thumbnails?.small) {
-        artwork.push({
-            src: coverAttachment.thumbnails.small.url,
-            sizes: `${coverAttachment.thumbnails.small.width}x${coverAttachment.thumbnails.small.height}`,
-            type: coverUrlType
-        });
-    }
+        const coverUrl = coverFile.type === 'external' ? coverFile.external.url : coverFile.file.url;
+        const coverVideoUrl = getFiles(page, 'Обложка').find(f => f.name.includes('_video'))?.file?.url;
+        const coverType = coverVideoUrl ? 'video' : 'image';
 
-    artwork.push({
-        src: coverAttachment.url,
-        sizes: '512x512', // A sensible default for the original image whose size is unknown.
-        type: coverUrlType,
+        return {
+            id: page.id,
+            name,
+            description: getRichText(page, 'Описание'),
+            coverUrl,
+            coverVideoUrl,
+            coverType,
+            trackIds: getRelationIds(page, 'Песни'),
+            tracks: [], // Will be populated later
+            isFavorites: false, // Will be set later
+            type: getSelect(page, 'Тип') as 'встроенный' | 'пользовательский' || 'пользовательский',
+            collectionType: getSelect(page, 'Альбом/Плейлист') as 'альбом' | 'плейлист' || 'плейлист',
+            artistId: getRelationIds(page, 'Исполнитель')[0],
+            releaseDate: getDate(page, 'Дата выхода'),
+        };
+    } catch (error) {
+        console.error(`Error mapping playlist with ID ${page.id}:`, error);
+        return null;
+    }
+};
+
+const fetchAllSimpleArtists = async (): Promise<Map<string, SimpleArtist>> => {
+    const artistPages = await queryDatabase(ARTISTS_DATABASE_ID);
+    const artistMap = new Map<string, SimpleArtist>();
+    artistPages.forEach(page => {
+        const simpleArtist = mapNotionPageToSimpleArtist(page);
+        artistMap.set(simpleArtist.id, simpleArtist);
     });
-    
-    const coverUrl = coverAttachment.thumbnails?.large?.url || coverAttachment.url;
-
-    return { 
-        id: record.id, 
-        title: fields['Название'], 
-        artists: artists,
-        lyrics: fields['Слова'] || '', 
-        audioUrl: fields['Аудио'][0].url, 
-        artwork,
-        coverUrl,
-        coverUrlType,
-        likes: fields['Лайки'] || 0,
-        listens: fields['Прослушивания'] || 0,
-        youtubeClipUrl: fields['клип'],
-        mat: fields['МАТ'] || false,
-    };
+    return artistMap;
 };
 
 export const fetchTracks = async (): Promise<Track[]> => {
-  const [artistsResponse, tracksResponse] = await Promise.all([
-    fetchFromAirtable(ARTISTS_TABLE_NAME),
-    fetchFromAirtable(MUSIC_TABLE_NAME)
-  ]);
-  const artistRecords: AirtableArtistRecord[] = artistsResponse.records || [];
+    const artistMap = await fetchAllSimpleArtists();
+    const trackPages = await queryDatabase(MUSIC_DATABASE_ID);
+    return trackPages
+        .map(page => mapNotionPageToTrack(page, artistMap))
+        .filter((t): t is Track => t !== null);
+};
 
-  const artistMap = new Map<string, SimpleArtist>();
-  artistRecords.forEach(record => {
-      artistMap.set(record.id, mapAirtableRecordToSimpleArtist(record));
-  });
+export const fetchSimpleArtistsByIds = async (artistIds: string[]): Promise<SimpleArtist[]> => {
+    if (!artistIds || artistIds.length === 0) return [];
+    try {
+        const artists = await Promise.all(
+            artistIds.map(async id => {
+                const page = await fetchPage(id);
+                return mapNotionPageToSimpleArtist(page);
+            })
+        );
+        return artists.filter(Boolean); // Filter out any nulls if a page fetch fails
+    } catch (error) {
+        console.error("Failed to fetch simple artists by IDs", error);
+        return [];
+    }
+};
 
-  const tracksData: { records?: AirtableTrackRecord[] } = tracksResponse;
-  if (!tracksData.records) {
-    return [];
-  }
-  return tracksData.records.map(record => mapAirtableRecordToTrack(record, artistMap)).filter((track): track is Track => track !== null);
+export const fetchAllArtists = async (): Promise<SimpleArtist[]> => {
+    const artistPages = await queryDatabase(ARTISTS_DATABASE_ID);
+    return artistPages.map(mapNotionPageToSimpleArtist);
+};
+
+export const fetchAllCollections = async (): Promise<Playlist[]> => {
+    const playlistPages = await queryDatabase(PLAYLISTS_DATABASE_ID);
+    return playlistPages
+        .map(mapNotionPageToPlaylist)
+        .filter((p): p is Playlist => p !== null);
 };
 
 export const fetchArtistDetails = async (artistId: string): Promise<Artist> => {
-    // 1. Fetch main artist record
-    const artistRecord: AirtableArtistRecord = await fetchFromAirtable(ARTISTS_TABLE_NAME, {}, `/${artistId}`);
-    const artistName = artistRecord.fields['Имя'] || 'Unknown Artist';
+    const artistPage = await fetchPage(artistId);
+    const artistMap = await fetchAllSimpleArtists(); 
 
-    // 2. Fetch all playlists and albums, then filter in code. This is more robust than a complex formula.
-    const allPlaylistsResponse = await fetchFromAirtable(PLAYLISTS_TABLE_NAME, {});
-    const allPlaylistRecords: AirtablePlaylistRecord[] = allPlaylistsResponse.records || [];
+    const trackPages = await queryDatabase(MUSIC_DATABASE_ID, {
+        filter: {
+            property: 'Исполнитель',
+            relation: {
+                contains: artistId,
+            },
+        },
+    });
 
-    const artistAlbumRecords = allPlaylistRecords.filter(record => 
-        record && record.fields && Array.isArray(record.fields['Исполнитель']) && record.fields['Исполнитель'].includes(artistId) &&
-        record.fields['Альбом/Плейлист'] === 'альбом'
-    );
-    
-    const albums: Playlist[] = artistAlbumRecords
-        .map(mapAirtableRecordToPlaylist)
-        .filter((p): p is Playlist => p !== null);
+    const albumPages = await queryDatabase(PLAYLISTS_DATABASE_ID, {
+        filter: {
+            and: [
+                {
+                    property: 'Исполнитель',
+                    relation: {
+                        contains: artistId,
+                    }
+                },
+                {
+                    property: 'Альбом/Плейлист',
+                    select: {
+                        equals: 'альбом',
+                    }
+                }
+            ]
+        },
+    });
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const unreleasedAlbumTrackIds = new Set<string>();
-    albums.forEach(album => {
-        if (album.releaseDate && new Date(album.releaseDate) >= today) {
-            album.trackIds.forEach(trackId => unreleasedAlbumTrackIds.add(trackId));
+    const tracks: Track[] = trackPages
+        .map(page => mapNotionPageToTrack(page, artistMap))
+        .filter((t): t is Track => t !== null);
+
+    const albums: Playlist[] = albumPages
+        .map(mapNotionPageToPlaylist)
+        .filter((p): p is Playlist => p !== null)
+        .map(album => ({
+            ...album,
+            tracks: album.trackIds.map(tid => tracks.find(t => t.id === tid)).filter((t): t is Track => !!t)
+        }));
+
+    return {
+        id: artistPage.id,
+        name: getTitle(artistPage, 'Имя'),
+        description: getRichText(artistPage, 'Описание'),
+        status: getSelect(artistPage, 'Status'),
+        photoUrl: getFileUrl(artistPage, 'Фото'),
+        tracks,
+        albums,
+    };
+};
+
+export const loginUser = async (email: string, pass: string): Promise<User> => {
+    const users = await queryDatabase(USERS_DATABASE_ID, {
+        filter: {
+            property: 'Почта',
+            email: {
+                equals: email.toLowerCase(),
+            },
+        },
+    });
+
+    if (users.length === 0) {
+        throw new Error('Пользователь с таким email не найден.');
+    }
+    const userPage = users[0];
+    const storedPass = getRichText(userPage, 'Пароль');
+    if (pass !== storedPass) {
+        throw new Error('Неверный пароль.');
+    }
+    return mapNotionPageToUser(userPage);
+};
+
+export const registerUser = async (email: string, pass: string, name: string): Promise<User> => {
+    const existingUsers = await queryDatabase(USERS_DATABASE_ID, {
+        filter: {
+            property: 'Почта',
+            email: {
+                equals: email.toLowerCase(),
+            },
+        },
+    });
+
+    if (existingUsers.length > 0) {
+        throw new Error('Пользователь с таким email уже существует.');
+    }
+
+    const defaultAvatar = await fetchMediaUrl("Аватар стандартный");
+
+    const newUserPage = await createPage({
+        parent: { database_id: USERS_DATABASE_ID },
+        properties: {
+            'Имя': { title: [{ text: { content: name } }] },
+            'Почта': { email: email.toLowerCase() },
+            'Пароль': { rich_text: [{ text: { content: pass } }] },
+            'Аватар': { files: [{ name: "default_avatar.png", type: "external", external: { url: defaultAvatar || 'https://i.postimg.cc/G3K2BYkT/joysic.png' } }] }
         }
     });
 
-    // 3. Gather all unique track IDs from the artist's main tracks and all their albums
-    const artistTrackIds = artistRecord.fields['Треки'] || [];
-    const albumTrackIds = albums.flatMap(album => album.trackIds);
-    const allTrackIds = [...new Set([...artistTrackIds, ...albumTrackIds])];
-
-    let allTracks: Track[] = [];
-
-    // 4. Fetch all unique tracks if any exist
-    if (allTrackIds.length > 0) {
-        const trackFormula = "OR(" + allTrackIds.map(id => `RECORD_ID() = '${id}'`).join(',') + ")";
-        const tracksResponse = await fetchFromAirtable(MUSIC_TABLE_NAME, {}, `?filterByFormula=${encodeURIComponent(trackFormula)}`);
-        const trackRecords: AirtableTrackRecord[] = tracksResponse.records || [];
-        
-        // We need a map of all artists to correctly assign artist names to tracks, especially for collaborations.
-        const artistsResponse = await fetchFromAirtable(ARTISTS_TABLE_NAME);
-        const allArtistRecords: AirtableArtistRecord[] = artistsResponse.records || [];
-        const artistMap = new Map<string, SimpleArtist>();
-        allArtistRecords.forEach(record => {
-            artistMap.set(record.id, mapAirtableRecordToSimpleArtist(record));
-        });
-
-        allTracks = trackRecords
-            .map(record => mapAirtableRecordToTrack(record, artistMap))
-            .filter((track): track is Track => track !== null);
-    }
-
-    const allReleasedTracks = allTracks.filter(track => !unreleasedAlbumTrackIds.has(track.id));
-    
-    // 5. Populate the tracks for the main artist object and for each album
-    const tracksForArtistPage = allReleasedTracks.filter(track => artistTrackIds.includes(track.id));
-    albums.forEach(album => {
-        album.tracks = allTracks.filter(track => album.trackIds.includes(track.id));
+    const favoritesPlaylist = await createPage({
+        parent: { database_id: PLAYLISTS_DATABASE_ID },
+        properties: {
+            'Название': { title: [{ text: { content: 'Любимое' } }] },
+            'Тип': { select: { name: 'встроенный' } },
+            'пользователи': { relation: [{ id: newUserPage.id }] }
+        }
     });
 
-    const photoAttachment = artistRecord.fields['Фото']?.[0];
-    const photoUrl = photoAttachment?.thumbnails?.large?.url || photoAttachment?.url;
-
-    // 6. Return the fully populated Artist object
-    return {
-        id: artistRecord.id,
-        name: artistName,
-        description: artistRecord.fields['Описание'],
-        status: artistRecord.fields['Status'],
-        photoUrl: photoUrl,
-        tracks: tracksForArtistPage,
-        albums: albums
-    };
-};
-
-const mapAirtableRecordToPlaylist = (record: AirtablePlaylistRecord): Playlist | null => {
-    const fields = record.fields;
-    const coverAttachment = fields['Обложка']?.[0];
-
-    if (!fields['Название'] || !coverAttachment) {
-        return null;
-    }
-    const type = fields['Тип'] || 'пользовательский';
-    const collectionType = type === 'встроенный' ? 'плейлист' : (fields['Альбом/Плейлист'] || 'плейлист');
-
-    let coverUrl = '';
-    let coverVideoUrl: string | undefined = undefined;
-    const coverType: 'image' | 'video' = coverAttachment.type?.startsWith('video') ? 'video' : 'image';
-
-    if (coverType === 'video') {
-        coverVideoUrl = coverAttachment.url;
-        coverUrl = coverAttachment.thumbnails?.large?.url || '';
-    } else {
-        coverUrl = coverAttachment.thumbnails?.large?.url || coverAttachment.url;
-    }
-
-    return {
-        id: record.id,
-        name: fields['Название'],
-        description: fields['Описание'] || '',
-        coverUrl,
-        coverVideoUrl,
-        coverType,
-        trackIds: fields['Песни'] || [],
-        tracks: [], // to be populated later
-        isFavorites: false, // will be set later
-        type: type,
-        collectionType: collectionType,
-        artistId: fields['Исполнитель']?.[0],
-        releaseDate: fields['Дата выхода'],
-    };
-};
-
-export const fetchPlaylistsForUser = async (user: User): Promise<{ playlists: Playlist[], likedAlbums: Playlist[], favoritesPlaylistId: string | null }> => {
-    const response = await fetchFromAirtable(PLAYLISTS_TABLE_NAME, {});
-    const allPlaylistRecords: AirtablePlaylistRecord[] = response.records || [];
-
-    const userPlaylists: Playlist[] = [];
-    const likedAlbums: Playlist[] = [];
-    let favoritesPlaylist: Playlist | null = null;
-    
-    const favoriteIds = Array.isArray(user.favoriteCollectionIds) ? user.favoriteCollectionIds : [];
-    
-    const userFavoriteCollections = allPlaylistRecords
-      .filter(record => record && record.id && favoriteIds.includes(record.id))
-      .map(mapAirtableRecordToPlaylist)
-      .filter((p): p is Playlist => p !== null);
-
-    for (const collection of userFavoriteCollections) {
-      if (collection.name === 'Любимое' && collection.type === 'встроенный') {
-        favoritesPlaylist = collection;
-      } else if (collection.collectionType === 'альбом') {
-        likedAlbums.push(collection);
-      }
-    }
-
-    if (favoritesPlaylist) {
-        userPlaylists.push(favoritesPlaylist);
-    }
-
-    // Find and add the shared "Новые артисты" playlist.
-    const newArtistsPlaylistRecord = allPlaylistRecords.find(record => record && record.fields && record.fields['Название'] === 'Новые артисты');
-    if (newArtistsPlaylistRecord && newArtistsPlaylistRecord.fields) {
-        const isUserAlreadyLinked = newArtistsPlaylistRecord.fields['пользователи']?.includes(user.id);
-        if (!isUserAlreadyLinked) {
-            try {
-                const playlistId = newArtistsPlaylistRecord.id;
-                const existingUsers = newArtistsPlaylistRecord.fields['пользователи'] || [];
-                const updatedUsers = [...new Set([...existingUsers, user.id])];
-                fetchFromAirtable(PLAYLISTS_TABLE_NAME, {
-                    method: 'PATCH',
-                    body: JSON.stringify({ records: [{ id: playlistId, fields: { 'пользователи': updatedUsers } }] })
-                }).catch(e => console.error('Background update of "Новые артисты" playlist failed:', e));
-            } catch (e) {
-                console.error('Failed to prepare update for "Новые артисты" playlist:', e);
+    await updatePage(newUserPage.id, {
+        properties: {
+            'Любимый плейлист': {
+                relation: [{ id: favoritesPlaylist.id }]
             }
         }
-        const mappedNewArtistsPlaylist = mapAirtableRecordToPlaylist(newArtistsPlaylistRecord);
-        if (mappedNewArtistsPlaylist) {
-            userPlaylists.push(mappedNewArtistsPlaylist);
-        }
-    }
-    
-    // De-duplicate in case "Любимое" is also linked via the 'пользователи' field
-    const finalPlaylists = Array.from(new Map(userPlaylists.map(p => [p.id, p])).values());
+    });
 
-    return { playlists: finalPlaylists, likedAlbums, favoritesPlaylistId: favoritesPlaylist ? favoritesPlaylist.id : null };
+    const finalUserPage = await fetchPage(newUserPage.id);
+    return mapNotionPageToUser(finalUserPage);
 };
 
-export const fetchBetaImage = async (): Promise<string | null> => {
-    const formula = `{Название} = 'Бета'`;
-    try {
-        const response = await fetchFromAirtable(PHOTOS_TABLE_NAME, {}, `?filterByFormula=${encodeURIComponent(formula)}`);
-        if (response.records && response.records.length > 0 && response.records[0].fields['Фото']?.[0]?.url) {
-            return response.records[0].fields['Фото'][0].url;
+export const updateUserLikes = async (user: User, updates: { likedTrackIds?: string[], likedArtistIds?: string[], favoriteCollectionIds?: string[] }, favoritesPlaylistId?: string) => {
+    const properties: any = {};
+    if (updates.likedTrackIds) {
+        properties['Лайки песен'] = { relation: updates.likedTrackIds.map(id => ({ id })) };
+        if (favoritesPlaylistId) {
+             await updatePage(favoritesPlaylistId, {
+                properties: {
+                    'Песни': { relation: updates.likedTrackIds.map(id => ({ id })) }
+                }
+            });
         }
-    } catch (error) {
-        console.error('Error fetching beta image from Airtable:', error);
+    }
+    if (updates.likedArtistIds) {
+        properties['Любимые исполнители'] = { relation: updates.likedArtistIds.map(id => ({ id })) };
+    }
+    if (updates.favoriteCollectionIds) {
+        properties['Любимый плейлист'] = { relation: updates.favoriteCollectionIds.map(id => ({ id })) };
+    }
+
+    if (Object.keys(properties).length > 0) {
+        await updatePage(user.id, { properties });
+    }
+};
+
+export const incrementTrackStats = async (trackId: string, propertyName: 'Лайки' | 'Прослушивания', currentValue: number, incrementBy: number = 1) => {
+    const newValue = Math.max(0, currentValue + incrementBy);
+    await updatePage(trackId, {
+        properties: {
+            [propertyName]: { number: newValue }
+        }
+    });
+};
+
+export const updateUserListeningTime = async (userId: string, totalMinutes: number) => {
+    await updatePage(userId, {
+        properties: {
+            'Время прослушивания': { number: totalMinutes }
+        }
+    });
+};
+
+export const fetchPlaylistsForUser = async (user: User) => {
+    const userPlaylistsPages = await queryDatabase(PLAYLISTS_DATABASE_ID, {
+        filter: {
+            or: [
+                {
+                    property: 'Тип',
+                    select: {
+                        equals: 'встроенный'
+                    }
+                },
+                {
+                    property: 'пользователи',
+                    relation: {
+                        contains: user.id
+                    }
+                }
+            ]
+        }
+    });
+
+    const userPlaylists = userPlaylistsPages
+      .map(mapNotionPageToPlaylist)
+      .filter((p): p is Playlist => p !== null);
+      
+    const favoritesPlaylistId = userPlaylists.find(p => p.type === 'встроенный' && p.name === 'Любимое')?.id;
+
+    const likedAlbumIds = user.favoriteCollectionIds.filter(id => id !== favoritesPlaylistId);
+    let likedAlbums: Playlist[] = [];
+    if (likedAlbumIds.length > 0) {
+        const likedAlbumPages = await Promise.all(
+            likedAlbumIds.map(id => fetchPage(id).catch(() => null))
+        );
+        likedAlbums = likedAlbumPages
+            .filter(Boolean)
+            .map(page => mapNotionPageToPlaylist(page as any))
+            .filter((p): p is Playlist => p !== null);
+    }
+    
+    return { playlists: userPlaylists, likedAlbums, favoritesPlaylistId };
+};
+
+export const fetchMediaUrl = async (name: string): Promise<string | null> => {
+    const results = await queryDatabase(PHOTOS_DATABASE_ID, {
+        filter: {
+            property: 'Название',
+            title: {
+                equals: name
+            }
+        }
+    });
+    if (results.length > 0) {
+        return getFileUrl(results[0], 'Фото') || null;
     }
     return null;
 };
 
-const mapAirtableRecordToSimpleArtist = (record: AirtableArtistRecord): SimpleArtist => {
-    const photoAttachment = record.fields['Фото']?.[0];
-    const photoUrl = photoAttachment?.thumbnails?.large?.url || photoAttachment?.url;
-    return {
-        id: record.id,
-        name: record.fields['Имя'] || 'Unknown Artist',
-        photoUrl: photoUrl,
-    };
-};
-
-export const fetchSimpleArtistsByIds = async (artistIds: string[]): Promise<SimpleArtist[]> => {
-    if (!artistIds || artistIds.length === 0) {
-        return [];
-    }
-    const formula = "OR(" + artistIds.map(id => `RECORD_ID() = '${id}'`).join(',') + ")";
-    const response = await fetchFromAirtable(ARTISTS_TABLE_NAME, {}, `?filterByFormula=${encodeURIComponent(formula)}`);
-    const artistRecords: AirtableArtistRecord[] = response.records || [];
-    return artistRecords.map(mapAirtableRecordToSimpleArtist);
-};
-
-export const fetchAllArtists = async (): Promise<SimpleArtist[]> => {
-    const response = await fetchFromAirtable(ARTISTS_TABLE_NAME, {}, '?fields%5B%5D=Имя&fields%5B%5D=Фото');
-    const artistRecords: AirtableArtistRecord[] = response.records || [];
-    return artistRecords.map(mapAirtableRecordToSimpleArtist);
-};
-
-export const fetchAllCollections = async (): Promise<Playlist[]> => {
-    const response = await fetchFromAirtable(PLAYLISTS_TABLE_NAME, {});
-    const allPlaylistRecords: AirtablePlaylistRecord[] = response.records || [];
-    
-    return allPlaylistRecords
-        .map(mapAirtableRecordToPlaylist)
-        .filter((p): p is Playlist => p !== null);
-};
-
-export const createTrack = async (trackData: {
-    title: string;
-    artistId: string;
-    audioUrl: string;
-    coverUrl: string;
-    mat: boolean;
-}): Promise<void> => {
-    await fetchFromAirtable(MUSIC_TABLE_NAME, {
-        method: 'POST',
-        body: JSON.stringify({
-            records: [
-                {
-                    fields: {
-                        'Название': trackData.title,
-                        'Исполнитель': [trackData.artistId],
-                        'Аудио': [{ url: trackData.audioUrl }],
-                        'Обложка трека': [{ url: trackData.coverUrl }],
-                        'МАТ': trackData.mat,
-                        'Лайки': 0,
-                        'Прослушивания': 0,
-                    },
-                },
-            ],
-        }),
-    });
+export const fetchBetaImage = async (): Promise<string | null> => {
+    return fetchMediaUrl('Бета');
 };
