@@ -1,4 +1,3 @@
-
 import React from 'react';
 import type { Track } from '../types';
 import { PlayIcon, PauseIcon, MatBadgeStatic } from './IconComponents';
@@ -10,9 +9,10 @@ interface MiniPlayerProps {
   progress: number;
   onPlayPause: () => void;
   onExpand: () => void;
+  onOpenMatInfo: () => void;
 }
 
-const MiniPlayer: React.FC<MiniPlayerProps> = ({ track, isPlaying, progress, onPlayPause, onExpand }) => {
+const MiniPlayer: React.FC<MiniPlayerProps> = ({ track, isPlaying, progress, onPlayPause, onExpand, onOpenMatInfo }) => {
   const handlePlayPauseClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     onPlayPause();
@@ -30,14 +30,14 @@ const MiniPlayer: React.FC<MiniPlayerProps> = ({ track, isPlaying, progress, onP
         </div>
 
         <div className="relative w-12 h-12 rounded-lg bg-surface-light overflow-hidden flex-shrink-0">
-          <TrackCover asset={track.cover} alt={track.title} className="w-full h-full" />
+          <TrackCover asset={track.cover} alt={track.title} className="w-full h-full" sizes="48px" />
         </div>
         <div className="flex-grow mx-3 overflow-hidden">
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center">
               <p className="font-semibold text-primary truncate">{track.title}</p>
-              {track.mat && <MatBadgeStatic className="flex-shrink-0"/>}
+              {track.mat && <MatBadgeStatic className="ml-1.5 flex-shrink-0"/>}
             </div>
-            <p className="text-sm text-text-secondary truncate">{track.artists.map(a => a.name).join(', ')}</p>
+            <p className="text-sm text-text-secondary truncate">{track.artists?.map(a => a.name).join(', ')}</p>
         </div>
         <button
             onClick={handlePlayPauseClick}

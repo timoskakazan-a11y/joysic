@@ -45,7 +45,12 @@ const AlbumCard = React.memo<AlbumCardProps>(({ album, isLiked, onSelect, onTogg
                 {album.coverType === 'video' && album.coverVideoUrl ? (
                     <video src={album.coverVideoUrl} poster={album.cover.full} autoPlay loop muted playsInline className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 smooth-hover" />
                 ) : (
-                    <TrackCover asset={album.cover} alt={album.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 smooth-hover" />
+                    <TrackCover 
+                        asset={album.cover} 
+                        alt={album.name} 
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 smooth-hover" 
+                        sizes="(max-width: 640px) 160px, 192px" 
+                    />
                 )}
                 {isUpcoming ? (
                     <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center text-center p-2">

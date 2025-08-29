@@ -1,8 +1,3 @@
-
-
-
-
-
 import React, { useState, useEffect, useMemo } from 'react';
 import type { Artist, Playlist, Track } from '../types';
 import { PlayIcon, HeartIcon, ChevronLeftIcon, SoundWaveIcon, MatBadge } from './IconComponents';
@@ -83,10 +78,11 @@ const ArtistPage: React.FC<ArtistPageProps> = ({ artist, onBack, onPlayTrack, on
         </button>
         <header className="flex flex-col md:flex-row items-center gap-6 md:gap-10 mb-8 mt-16 md:mt-24">
             <div className="relative w-40 h-40 md:w-48 md:h-48 rounded-full bg-surface shadow-lg overflow-hidden flex-shrink-0 border-4 border-background">
-                <TrackCover 
+                <TrackCover
                     asset={artist.photo}
-                    alt={artist.name} 
+                    alt={artist.name}
                     className="absolute inset-0 w-full h-full"
+                    sizes="(max-width: 768px) 160px, 192px"
                 />
             </div>
             <div className="text-center md:text-left">
@@ -155,14 +151,16 @@ const ArtistPage: React.FC<ArtistPageProps> = ({ artist, onBack, onPlayTrack, on
                     )}
                 </div>
                 <div className="relative w-12 h-12 rounded-md bg-surface overflow-hidden flex-shrink-0">
-                  <TrackCover asset={track.cover} alt={track.title} className="w-full h-full" />
+                  <TrackCover asset={track.cover} alt={track.title} className="w-full h-full" sizes="48px" />
                 </div>
                 <div className="flex-grow mx-4 overflow-hidden">
-                  <p className={`font-semibold ${isActive ? 'text-accent' : 'text-text'}`}>
-                    {track.title}
-                    {track.mat && <MatBadge onClick={onOpenMatInfo} className="inline-block align-baseline ml-1.5" />}
-                  </p>
-                  <p className="text-sm text-text-secondary">{track.artists.map(a => a.name).join(', ')}</p>
+                  <div className="flex items-baseline">
+                    <p className={`font-semibold truncate ${isActive ? 'text-accent' : 'text-text'}`}>
+                      {track.title}
+                    </p>
+                    {track.mat && <MatBadge onClick={onOpenMatInfo} className="ml-1.5 flex-shrink-0"/>}
+                  </div>
+                  <p className="text-sm text-text-secondary truncate">{track.artists?.map(a => a.name).join(', ')}</p>
                 </div>
                 <div className="flex items-center gap-4 text-text-secondary text-sm">
                     <button 

@@ -17,8 +17,9 @@ const BetaLockScreen: React.FC<BetaLockScreenProps> = ({ imageAsset }) => {
           {imageAsset ? (
             <TrackCover
               asset={imageAsset}
-              alt="Бета-тест" 
+              alt="Бета-тест"
               className="w-56 h-56 mx-auto mb-8 drop-shadow-[0_10px_15px_rgba(187,134,252,0.15)] animate-breathing"
+              sizes="224px"
             />
           ) : (
             <div className="w-56 h-56 mx-auto mb-8 bg-surface-light rounded-2xl animate-pulse"></div>

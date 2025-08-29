@@ -1,4 +1,3 @@
-
 import React from 'react';
 import type { Track } from '../types';
 import { MusicNoteIcon, TextIcon, UserIcon, PlayIcon, PauseIcon, SoundWaveIcon } from './IconComponents';
@@ -54,10 +53,10 @@ const MusicTable: React.FC<MusicTableProps> = ({ tracks, currentTrackId, isPlayi
                   </button>
                 </div>
                 <div className={`col-span-4 flex items-center gap-3 ${isActive ? 'text-primary font-semibold' : 'text-white'}`}>
-                    <TrackCover asset={track.cover} alt={track.title} className="w-10 h-10 rounded-md" />
+                    <TrackCover asset={track.cover} alt={track.title} className="w-10 h-10 rounded-md" sizes="40px" />
                     <span>{track.title}</span>
                 </div>
-                <div className="col-span-3 text-slate-300 truncate">{track.artists.map(a => a.name).join(', ')}</div>
+                <div className="col-span-3 text-slate-300 truncate">{track.artists?.map(a => a.name).join(', ')}</div>
                 <div className="col-span-4 text-slate-400 truncate">{track.lyrics.substring(0, 50)}{track.lyrics.length > 50 ? '...' : ''}</div>
               </div>
             );

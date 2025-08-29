@@ -1,7 +1,3 @@
-
-
-
-
 import React, { useMemo } from 'react';
 import type { Playlist, Track } from '../types';
 import { PlayIcon, PauseIcon, ChevronLeftIcon, SoundWaveIcon, HeartIcon, MatBadge } from './IconComponents';
@@ -62,7 +58,12 @@ const PlaylistDetailPage: React.FC<PlaylistDetailPageProps> = ({ playlist, onBac
                 {playlist.coverType === 'video' && playlist.coverVideoUrl ? (
                     <video src={playlist.coverVideoUrl} poster={playlist.cover.full} autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover" />
                 ) : (
-                    <TrackCover asset={playlist.cover} alt={playlist.name} className="absolute inset-0 w-full h-full" />
+                    <TrackCover 
+                      asset={playlist.cover} 
+                      alt={playlist.name} 
+                      className="absolute inset-0 w-full h-full" 
+                      sizes="(max-width: 768px) 160px, 192px" 
+                    />
                 )}
             </div>
             <div className="text-center md:text-left flex flex-col md:h-48">
@@ -127,14 +128,16 @@ const PlaylistDetailPage: React.FC<PlaylistDetailPageProps> = ({ playlist, onBac
                     )}
                 </div>
                 <div className="relative w-12 h-12 rounded-md bg-surface overflow-hidden flex-shrink-0">
-                  <TrackCover asset={track.cover} alt={track.title} className="w-full h-full" />
+                  <TrackCover asset={track.cover} alt={track.title} className="w-full h-full" sizes="48px" />
                 </div>
                 <div className="flex-grow mx-4 overflow-hidden">
-                  <p className={`font-semibold ${isActive ? 'text-accent' : 'text-text'}`}>
-                      {track.title}
-                      {track.mat && <MatBadge onClick={onOpenMatInfo} className="inline-block align-baseline ml-1.5"/>}
-                  </p>
-                  <p className="text-sm text-text-secondary">{track.artists.map(a => a.name).join(', ')}</p>
+                  <div className="flex items-baseline">
+                    <p className={`font-semibold truncate ${isActive ? 'text-accent' : 'text-text'}`}>
+                        {track.title}
+                    </p>
+                    {track.mat && <MatBadge onClick={onOpenMatInfo} className="ml-1.5 flex-shrink-0"/>}
+                  </div>
+                  <p className="text-sm text-text-secondary truncate">{track.artists?.map(a => a.name).join(', ')}</p>
                 </div>
                 <div className="flex items-center gap-4 text-text-secondary text-sm">
                     <button 

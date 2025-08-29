@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { fetchTracks, fetchArtistDetails, loginUser, registerUser, updateUserLikes, fetchPlaylistsForUser, incrementTrackStats, fetchMediaAsset, fetchSimpleArtistsByIds, updateUserListeningTime, fetchAllArtists, fetchAllCollections } from './services/airtableService';
+import { fetchAllTracks, fetchArtistDetails, loginUser, registerUser, updateUserLikes, fetchPlaylistsForUser, incrementTrackStats, fetchMediaAsset, fetchSimpleArtistsByIds, updateUserListeningTime, fetchAllArtists, fetchAllCollections, fetchTracksByIds, fetchPlaylistsByIds } from './services/airtableService';
 import type { Track, Artist, User, Playlist, SimpleArtist, ImageAsset } from './types';
 import Player from './components/Player';
 import ArtistPage from './components/ArtistPage';
@@ -22,7 +22,6 @@ const config: AppConfig = {
   BETA_LOCK_MODE: 'off', // 'on' or 'off'
 };
 
-// FIX: Added a return statement with the application's JSX structure, resolving the error where the component was returning 'void'.
 const App: React.FC = () => {
   const [isBetaLocked, setIsBetaLocked] = useState(false);
   const [betaImageAsset, setBetaImageAsset] = useState<ImageAsset | null>(null);
@@ -41,6 +40,8 @@ const App: React.FC = () => {
   const [currentTrackIndex, setCurrentTrackIndex] = useState<number | null>(null);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isCurrentTrackLoading, setIsCurrentTrackLoading] = useState(false);
+  const [isLibraryHydrating, setIsLibraryHydrating] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState({ currentTime: 0, duration: 0 });
   const [initialSeekTime, setInitialSeekTime] = useState<number | null>(null);
@@ -55,6 +56,7 @@ const App: React.FC = () => {
   const [isMatInfoModalOpen, setIsMatInfoModalOpen] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const preloadAudioRef = useRef<HTMLAudioElement | null>(null);
   
   const currentTrack = currentTrackIndex !== null && shuffledTracks.length > 0 ? shuffledTracks[currentTrackIndex] : null;
 
@@ -96,75 +98,91 @@ const App: React.FC = () => {
     authenticateUser();
   }, [isCheckingBeta, isBetaLocked]);
   
-  // Effect for tracking listening time in the background
   useEffect(() => {
-    if (!isPlaying) {
-        return; // No need for interval if not playing
-    }
-
+    if (!isPlaying) return;
     const interval = setInterval(() => {
-        // Use functional update to avoid stale state and dependency issues
         setUser(currentUser => {
             if (!currentUser) return null;
-
             const newTotalMinutes = (currentUser.totalListeningMinutes || 0) + (5 / 60);
             const updatedUser: User = { ...currentUser, totalListeningMinutes: newTotalMinutes };
-
-            // Side effects: update storage and backend
             localStorage.setItem('joysicUser', JSON.stringify(updatedUser));
-            updateUserListeningTime(updatedUser.id, newTotalMinutes).catch(err => {
-                console.error("Failed to sync listening time:", err);
-            });
-
+            updateUserListeningTime(updatedUser.id, newTotalMinutes).catch(err => console.error("Failed to sync listening time:", err));
             return updatedUser;
         });
-    }, 5000); // Sync every 5 seconds
-
-    // Cleanup function to clear interval
+    }, 5000);
     return () => clearInterval(interval);
   }, [isPlaying]);
 
   const loadData = useCallback(async () => {
     if (!user) {
-      setIsLoading(false);
-      return;
+        setIsLoading(false);
+        return;
     }
     setIsLoading(true);
     setError(null);
+
     try {
-      const [fetchedTracks, fetchedPlaylistsData, fetchedLikedArtists, fetchedAllArtists, fetchedAllCollections] = await Promise.all([
-        fetchTracks(),
-        fetchPlaylistsForUser(user),
-        fetchSimpleArtistsByIds(user.likedArtistIds),
-        fetchAllArtists(),
-        fetchAllCollections(),
-      ]);
+        // STAGE 1: Load essential user data for an instantly interactive app
+        const [fetchedPlaylistsData, fetchedLikedArtists] = await Promise.all([
+            fetchPlaylistsForUser(user),
+            fetchSimpleArtistsByIds(user.likedArtistIds),
+        ]);
+        
+        const essentialTrackIds = new Set<string>();
+        user.likedTrackIds.forEach(id => essentialTrackIds.add(id));
+        fetchedPlaylistsData.playlists.forEach(p => p.trackIds.forEach(id => essentialTrackIds.add(id)));
+        fetchedPlaylistsData.likedAlbums.forEach(p => p.trackIds.forEach(id => essentialTrackIds.add(id)));
+        
+        const essentialTracks = await fetchTracksByIds(Array.from(essentialTrackIds));
+        
+        const essentialArtistIds = new Set<string>(user.likedArtistIds);
+        essentialTracks.forEach(t => t.artistIds.forEach(id => essentialArtistIds.add(id)));
+        
+        const essentialArtists = await fetchSimpleArtistsByIds(Array.from(essentialArtistIds));
+        const artistsMap = new Map(essentialArtists.map(a => [a.id, a]));
+        
+        const hydrateTracks = (tracksToHydrate: Track[]) => {
+            tracksToHydrate.forEach(t => {
+                t.artists = t.artistIds.map(id => artistsMap.get(id)).filter((a): a is SimpleArtist => !!a);
+            });
+        };
+        hydrateTracks(essentialTracks);
 
-      setTracks(fetchedTracks);
-      setAllArtists(fetchedAllArtists);
-      setAllCollections(fetchedAllCollections);
+        const essentialTracksMap = new Map(essentialTracks.map(t => [t.id, t]));
+        const populate = (p: Playlist): Playlist => ({
+            ...p,
+            tracks: p.trackIds.map(id => essentialTracksMap.get(id)).filter((t): t is Track => !!t),
+            isHydrated: true,
+        });
 
-      const trackMap = new Map(fetchedTracks.map(t => [t.id, t]));
-      
-      const populatedPlaylists = fetchedPlaylistsData.playlists.map(p => ({
-          ...p,
-          tracks: p.trackIds.map(id => trackMap.get(id)).filter((t): t is Track => t !== undefined)
-      }));
+        setPlaylists(fetchedPlaylistsData.playlists.map(populate));
+        setLikedAlbums(fetchedPlaylistsData.likedAlbums.map(populate));
+        setLikedArtists(fetchedLikedArtists);
+        setTracks(essentialTracks);
+        setIsLoading(false);
 
-      const populatedLikedAlbums = fetchedPlaylistsData.likedAlbums.map(p => ({
-          ...p,
-          tracks: p.trackIds.map(id => trackMap.get(id)).filter((t): t is Track => t !== undefined)
-      }));
-
-      setPlaylists(populatedPlaylists);
-      setLikedAlbums(populatedLikedAlbums);
-      setLikedArtists(fetchedLikedArtists);
+        // STAGE 2: Hydrate the full library in the background for search
+        setIsLibraryHydrating(true);
+        const [allArtistRecords, allFetchedTracks, fetchedAllCollections] = await Promise.all([
+            fetchAllArtists(),
+            fetchAllTracks(),
+            fetchAllCollections(),
+        ]);
+        
+        const fullArtistsMap = new Map(allArtistRecords.map(a => [a.id, a]));
+        allFetchedTracks.forEach(t => {
+            t.artists = t.artistIds.map(id => fullArtistsMap.get(id)).filter((a): a is SimpleArtist => !!a);
+        });
+        
+        setAllArtists(allArtistRecords);
+        setTracks(allFetchedTracks);
+        setAllCollections(fetchedAllCollections);
+        setIsLibraryHydrating(false);
 
     } catch (err: any) {
-      setError(err.message || 'Failed to load data.');
-      console.error(err);
-    } finally {
-      setIsLoading(false);
+        setError(err.message || 'Failed to load data.');
+        console.error(err);
+        setIsLoading(false);
     }
   }, [user]);
 
@@ -174,44 +192,63 @@ const App: React.FC = () => {
     }
   }, [user, isAuthLoading, loadData]);
 
-  // Consolidated effect for audio playback management
+  // Audio Preloading Effect
+  useEffect(() => {
+    if (!currentTrack || !shuffledTracks.length || currentTrackIndex === null) return;
+
+    const nextIndex = (currentTrackIndex + 1) % shuffledTracks.length;
+    if (nextIndex === currentTrackIndex) return; 
+
+    const nextTrack = shuffledTracks[nextIndex];
+
+    if (nextTrack && nextTrack.audioUrl) {
+        if (!preloadAudioRef.current) {
+            preloadAudioRef.current = new Audio();
+            preloadAudioRef.current.crossOrigin = "anonymous";
+        }
+        if (preloadAudioRef.current.src !== nextTrack.audioUrl) {
+            preloadAudioRef.current.src = nextTrack.audioUrl;
+            preloadAudioRef.current.load();
+        }
+    }
+  }, [currentTrack, currentTrackIndex, shuffledTracks]);
+
+  // Reworked Audio Playback Logic for Reliability
   useEffect(() => {
       const audio = audioRef.current;
       if (!audio) return;
 
       if (currentTrack) {
-          // Handle source change if necessary
+          // Change source if different
           if (audio.src !== currentTrack.audioUrl) {
+              setIsCurrentTrackLoading(true);
               audio.src = currentTrack.audioUrl;
+              audio.load();
           }
 
-          // Handle play/pause state
-          if (isPlaying) {
-              const playPromise = audio.play();
-              if (playPromise !== undefined) {
-                  playPromise.catch(error => {
-                      // Ignore AbortError which is a result of rapid play/pause, not a real error.
-                      if (error.name !== 'AbortError') {
-                          console.error("Error playing audio:", error);
-                      }
-                  });
-              }
+          // Handle play/pause based on state, but only if not loading
+          if (isPlaying && !isCurrentTrackLoading) {
+              audio.play().catch(error => {
+                  if (error.name !== 'AbortError') {
+                      console.error("Error playing audio:", error);
+                      setIsPlaying(false); // Sync state on failure
+                  }
+              });
           } else {
               audio.pause();
           }
       } else {
-          // If there's no track, ensure it's paused and source is cleared
+          // No track, ensure it's paused
           audio.pause();
-          if (audio.src) {
-              audio.src = '';
-          }
+          setIsPlaying(false);
       }
-  }, [currentTrack, isPlaying]); // Re-run whenever the track or play state changes
+  }, [currentTrack, isPlaying, isCurrentTrackLoading]);
+
 
   useEffect(() => {
       if (scannedTrackId) {
           playTrackById(scannedTrackId);
-          setScannedTrackId(null); // Reset after playing
+          setScannedTrackId(null);
       }
   }, [scannedTrackId, tracks]);
 
@@ -222,12 +259,10 @@ const App: React.FC = () => {
           setShuffledTracks(sourceTracks);
           setCurrentTrackIndex(trackIndex);
           setIsPlaying(true);
-          setInitialSeekTime(0); // Start from beginning
+          setInitialSeekTime(0);
 
-          // Increment listens count optimistically
           const track = sourceTracks[trackIndex];
           incrementTrackStats(track.id, 'Прослушивания', track.listens, 1).catch(err => console.error("Failed to increment listens", err));
-          // Update local state to reflect change immediately
           setTracks(prev => prev.map(t => t.id === trackId ? {...t, listens: t.listens + 1} : t));
       } else {
           console.warn(`Track with id ${trackId} not found.`);
@@ -251,7 +286,8 @@ const App: React.FC = () => {
           setSelectedArtist(artistDetails);
       } catch (error) {
           console.error("Failed to fetch artist details", error);
-          setView('library'); // Go back if artist fails to load
+          setError(`Failed to fetch artist details: ${error instanceof Error ? error.message : String(error)}`);
+          setView('library');
       } finally {
           setIsArtistLoading(false);
       }
@@ -296,17 +332,22 @@ const App: React.FC = () => {
     }
   };
 
-  const handleLoadedMetadata = () => {
-    if (audioRef.current) {
-      setProgress({
-        currentTime: 0,
-        duration: audioRef.current.duration,
-      });
-      if (initialSeekTime !== null) {
-        audioRef.current.currentTime = initialSeekTime;
-        setInitialSeekTime(null);
-      }
+  const handleCanPlay = () => {
+    setIsCurrentTrackLoading(false);
+    if (audioRef.current && initialSeekTime !== null) {
+      audioRef.current.currentTime = initialSeekTime;
+      setInitialSeekTime(null);
     }
+    if (isPlaying) {
+      audioRef.current?.play().catch(e => console.error("Autoplay failed on CanPlay:", e));
+    }
+  };
+  
+  const handleAudioError = (e: React.SyntheticEvent<HTMLAudioElement, Event>) => {
+    console.error("Audio Error:", e.nativeEvent);
+    setIsPlaying(false);
+    setIsCurrentTrackLoading(false);
+    setError("Ошибка воспроизведения трека. Он может быть поврежден или недоступен.");
   };
 
   const handleToggleLike = async (type: 'track' | 'artist' | 'album', id: string) => {
@@ -321,7 +362,6 @@ const App: React.FC = () => {
         updatedUser = { ...user, likedTrackIds: newLikedTrackIds };
         updates.likedTrackIds = newLikedTrackIds;
         
-        // Optimistically update like count
         const track = tracks.find(t => t.id === id);
         if (track) {
             const newLikes = track.likes + (isLiked ? -1 : 1);
@@ -335,7 +375,6 @@ const App: React.FC = () => {
         updatedUser = { ...user, likedArtistIds: newLikedArtistIds };
         updates.likedArtistIds = newLikedArtistIds;
         
-        // Optimistically update local state for liked artists
         if (isLiked) {
             setLikedArtists(prev => prev.filter(a => a.id !== id));
         } else {
@@ -349,7 +388,6 @@ const App: React.FC = () => {
         updatedUser = { ...user, favoriteCollectionIds: newFavoriteCollectionIds };
         updates.favoriteCollectionIds = newFavoriteCollectionIds;
         
-        // Optimistically update local state for liked albums
         if (isLiked) {
             setLikedAlbums(prev => prev.filter(a => a.id !== id));
         } else {
@@ -362,7 +400,6 @@ const App: React.FC = () => {
     localStorage.setItem('joysicUser', JSON.stringify(updatedUser));
     await updateUserLikes(user, updates).catch(err => {
       console.error("Failed to sync likes", err);
-      // Revert optimistic update on failure
       setUser(user);
       localStorage.setItem('joysicUser', JSON.stringify(user));
     });
@@ -436,13 +473,21 @@ const App: React.FC = () => {
     return <AuthPage onLogin={handleLogin} onRegister={handleRegister} />;
   }
 
-  if (error) {
+  if (error && view !== 'library') {
+    // If there's an error, force back to library view to show it
+    setView('library');
+  }
+  
+  if (error && view === 'library') {
     return (
       <div className="bg-background min-h-screen flex flex-col items-center justify-center p-4 text-center">
         <h1 className="text-4xl font-black text-primary mb-4">Что-то пошло не так</h1>
         <p className="text-text-secondary mb-8 max-w-sm">{error}</p>
         <button 
-          onClick={() => loadData()}
+          onClick={() => {
+            setError(null);
+            loadData();
+          }}
           className="bg-accent text-background font-bold py-3 px-6 rounded-full hover:bg-opacity-80 transition-colors"
         >
           Попробовать снова
@@ -467,6 +512,7 @@ const App: React.FC = () => {
             tracks={tracks}
             allArtists={allArtists}
             allCollections={allCollections}
+            isLibraryHydrating={isLibraryHydrating}
             onSelectPlaylist={handleSelectPlaylist}
             onSelectArtist={handleSelectArtistById}
             onPlayTrack={playTrackById}
@@ -551,6 +597,7 @@ const App: React.FC = () => {
               progress={(progress.duration > 0) ? (progress.currentTime / progress.duration) * 100 : 0}
               onPlayPause={handlePlayPause}
               onExpand={() => setIsPlayerExpanded(true)}
+              onOpenMatInfo={() => setIsMatInfoModalOpen(true)}
             />
           </div>
         )
@@ -570,16 +617,16 @@ const App: React.FC = () => {
       <audio
         ref={audioRef}
         onTimeUpdate={handleTimeUpdate}
-        onLoadedMetadata={handleLoadedMetadata}
+        onCanPlay={handleCanPlay}
+        onLoadedData={handleCanPlay} // Fallback for some browsers
         onEnded={handleNextTrack}
         onPlay={() => setIsPlaying(true)}
         onPause={() => setIsPlaying(false)}
-        onError={(e) => console.error("Audio Error:", e)}
+        onError={handleAudioError}
         crossOrigin="anonymous"
       />
     </div>
   );
 };
 
-// FIX: Added a default export for the App component.
 export default App;

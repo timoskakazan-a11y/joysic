@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import type { Track } from '../types';
 import { PlayIcon, PauseIcon, SkipBackIcon, SkipForwardIcon, ChevronDownIcon, HeartIcon, YouTubeIcon, MoreOptionsIcon, MatBadge } from './IconComponents';
@@ -123,9 +122,10 @@ const Player: React.FC<PlayerProps> = ({ track, isPlaying, progress, onPlayPause
           {/* Left Side: Cover Art (Tablet and up) */}
           <div className="relative w-64 h-64 sm:w-72 sm:h-72 md:w-80 md:h-80 lg:w-96 lg:h-96 flex-shrink-0 rounded-2xl bg-surface shadow-2xl shadow-black/30 my-8 md:my-0 overflow-hidden">
             <TrackCover
-              asset={track.cover} 
-              alt={track.title} 
+              asset={track.cover}
+              alt={track.title}
               className="absolute inset-0 w-full h-full"
+              sizes="(max-width: 640px) 256px, (max-width: 768px) 288px, (max-width: 1024px) 320px, 384px"
             />
           </div>
           
@@ -139,7 +139,7 @@ const Player: React.FC<PlayerProps> = ({ track, isPlaying, progress, onPlayPause
                 {track.mat && <MatBadge onClick={onOpenMatInfo} className="inline-block align-middle ml-2" />}
               </h1>
               <button onClick={handleArtistClick} className="text-lg sm:text-xl font-medium text-text-secondary hover:text-primary transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50 rounded-md">
-                {track.artists.map(a => a.name).join(', ')}
+                {track.artists?.map(a => a.name).join(', ')}
               </button>
               {track.youtubeClipUrl && (
                 <a

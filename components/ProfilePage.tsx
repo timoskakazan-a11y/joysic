@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { User, ImageAsset } from '../types';
 import { ChevronLeftIcon, HeartIcon, UserIcon, MusicNoteIcon } from './IconComponents';
@@ -62,9 +61,10 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, stats, onBack, onLogout
                 <div className="flex flex-col items-center mb-8">
                     <div className="relative w-32 h-32 rounded-full mb-4 shadow-lg">
                          <TrackCover
-                            asset={user.avatar} 
-                            alt="User Avatar" 
-                            className="w-full h-full object-cover rounded-full border-4 border-surface-light" 
+                            asset={user.avatar}
+                            alt="User Avatar"
+                            className="w-full h-full object-cover rounded-full border-4 border-surface-light"
+                            sizes="128px"
                         />
                     </div>
                     <h2 className="text-3xl font-black text-primary">{user.name}</h2>
@@ -79,6 +79,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, stats, onBack, onLogout
                                 asset={monkeyImageAsset}
                                 alt="Decorative animation"
                                 className="w-full h-full object-cover"
+                                sizes="(max-width: 640px) 80px, 112px"
                             />
                         </div>
                     )}

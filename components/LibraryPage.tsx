@@ -1,8 +1,3 @@
-
-
-
-
-
 import React, { useState, useMemo, useCallback } from 'react';
 import type { User, Playlist, SimpleArtist, Track } from '../types';
 import { ShuffleIcon, SearchIcon, QrCodeIcon, SoundWaveIcon, MatBadge } from './IconComponents';
@@ -16,6 +11,7 @@ interface LibraryPageProps {
   tracks: Track[];
   allArtists: SimpleArtist[];
   allCollections: Playlist[];
+  isLibraryHydrating: boolean;
   onSelectPlaylist: (playlist: Playlist) => void;
   onSelectArtist: (artistId: string) => void;
   onPlayTrack: (trackId: string) => void;
@@ -52,7 +48,12 @@ const PlaylistCard = React.memo<{ playlist: Playlist; onSelect: (playlist: Playl
         {playlist.coverType === 'video' && playlist.coverVideoUrl ? (
           <video src={playlist.coverVideoUrl} poster={playlist.cover.full} autoPlay loop muted playsInline className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 smooth-hover" />
         ) : (
-          <TrackCover asset={playlist.cover} alt={playlist.name} className="w-full h-full transition-transform duration-500 group-hover:scale-110 smooth-hover" />
+          <TrackCover 
+            asset={playlist.cover} 
+            alt={playlist.name} 
+            className="w-full h-full transition-transform duration-500 group-hover:scale-110 smooth-hover"
+            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
+          />
         )}
         {isUpcoming && (
             <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center text-center p-2">
@@ -77,7 +78,12 @@ const ArtistCard = React.memo<{ artist: SimpleArtist; onSelect: (id: string) => 
   return (
     <div onClick={handleSelect} className="group cursor-pointer flex-shrink-0 w-32 sm:w-36 md:w-40 text-center">
       <div className="relative aspect-square w-full rounded-full shadow-lg overflow-hidden bg-surface transition-transform duration-300 group-hover:scale-105 smooth-hover">
-        <TrackCover asset={artist.photo} alt={artist.name} className="w-full h-full" />
+        <TrackCover 
+          asset={artist.photo} 
+          alt={artist.name} 
+          className="w-full h-full"
+          sizes="(max-width: 640px) 128px, 160px"
+        />
       </div>
       <div className="mt-3">
         <h3 className="font-bold text-primary truncate">{artist.name}</h3>
@@ -94,14 +100,16 @@ const SearchResultTrack = React.memo<{track: Track, isActive: boolean, isPlaying
         className={`flex items-center p-3 rounded-lg cursor-pointer transition-colors duration-200 group ${isActive ? 'bg-surface-light' : 'hover:bg-surface'}`}
       >
         <div className="relative w-12 h-12 rounded-md bg-surface overflow-hidden flex-shrink-0">
-          <TrackCover asset={track.cover} alt={track.title} className="w-full h-full" />
+          <TrackCover asset={track.cover} alt={track.title} className="w-full h-full" sizes="48px" />
         </div>
         <div className="flex-grow mx-4 overflow-hidden">
-          <p className={`font-semibold ${isActive ? 'text-accent' : 'text-text'}`}>
-              {track.title}
-              {track.mat && <MatBadge onClick={onOpenMatInfo} className="inline-block align-baseline ml-1.5"/>}
-          </p>
-          <p className="text-sm text-text-secondary">{track.artists.map(a => a.name).join(', ')}</p>
+          <div className="flex items-center">
+            <p className={`font-semibold truncate ${isActive ? 'text-accent' : 'text-text'}`}>
+                {track.title}
+            </p>
+            {track.mat && <MatBadge onClick={onOpenMatInfo} className="ml-1.5 flex-shrink-0"/>}
+          </div>
+          <p className="text-sm text-text-secondary truncate">{track.artists?.map(a => a.name).join(', ')}</p>
         </div>
         {isActive && (
             <SoundWaveIcon isPlaying={!!isPlaying} className="w-5 h-5 mx-auto text-accent flex-shrink-0" />
@@ -110,18 +118,18 @@ const SearchResultTrack = React.memo<{track: Track, isActive: boolean, isPlaying
     );
 });
 
-const LibraryPage: React.FC<LibraryPageProps> = ({ user, playlists, likedAlbums, likedArtists, tracks, allArtists, allCollections, onSelectPlaylist, onSelectArtist, onPlayTrack, onShufflePlayAll, onNavigateToProfile, onOpenScanner, currentTrackId, isPlaying, onOpenMatInfo }) => {
+const LibraryPage: React.FC<LibraryPageProps> = ({ user, playlists, likedAlbums, likedArtists, tracks, allArtists, allCollections, isLibraryHydrating, onSelectPlaylist, onSelectArtist, onPlayTrack, onShufflePlayAll, onNavigateToProfile, onOpenScanner, currentTrackId, isPlaying, onOpenMatInfo }) => {
   const [searchQuery, setSearchQuery] = useState('');
   
   const searchResults = useMemo(() => {
-    if (searchQuery.trim().length < 2) {
+    if (isLibraryHydrating || searchQuery.trim().length < 2) {
         return { tracks: [], artists: [], albums: [], playlists: [] };
     }
     const lowercasedQuery = searchQuery.toLowerCase();
 
     const filteredTracks = tracks.filter(t => 
         t.title.toLowerCase().includes(lowercasedQuery) ||
-        t.artists.some(a => a.name.toLowerCase().includes(lowercasedQuery))
+        t.artists?.some(a => a.name.toLowerCase().includes(lowercasedQuery))
     );
     
     const filteredArtists = allArtists.filter(a => 
@@ -136,7 +144,7 @@ const LibraryPage: React.FC<LibraryPageProps> = ({ user, playlists, likedAlbums,
     const filteredPlaylists = filteredCollections.filter(c => c.collectionType === 'плейлист');
 
     return { tracks: filteredTracks, artists: filteredArtists, albums: filteredAlbums, playlists: filteredPlaylists };
-  }, [searchQuery, tracks, allArtists, allCollections]);
+  }, [searchQuery, tracks, allArtists, allCollections, isLibraryHydrating]);
 
 
   const hasContent = playlists.length > 0 || likedAlbums.length > 0 || likedArtists.length > 0;
@@ -266,9 +274,10 @@ const LibraryPage: React.FC<LibraryPageProps> = ({ user, playlists, likedAlbums,
           aria-label="Open profile"
         >
             <TrackCover
-                asset={user.avatar} 
-                alt="User Avatar" 
+                asset={user.avatar}
+                alt="User Avatar"
                 className="w-full h-full"
+                sizes="48px"
             />
         </button>
       </header>
@@ -276,10 +285,11 @@ const LibraryPage: React.FC<LibraryPageProps> = ({ user, playlists, likedAlbums,
       <div className="relative mb-8">
         <input
             type="text"
-            placeholder="Поиск по медиатеке"
+            placeholder={isLibraryHydrating ? "Подождите, медиатека загружается..." : "Поиск по медиатеке"}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-surface py-3 pl-12 pr-12 rounded-full border-2 border-transparent focus:border-accent focus:ring-0 focus:outline-none transition-colors"
+            disabled={isLibraryHydrating}
+            className="w-full bg-surface py-3 pl-12 pr-12 rounded-full border-2 border-transparent focus:border-accent focus:ring-0 focus:outline-none transition-colors disabled:opacity-50"
         />
         <div className="absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary pointer-events-none">
             <SearchIcon className="w-6 h-6" />

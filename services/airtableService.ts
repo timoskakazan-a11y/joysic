@@ -143,14 +143,11 @@ const mapRecordToPlaylist = (record: any): Playlist => ({
     releaseDate: record.fields['Дата выхода'],
 });
 
-const mapRecordToTrack = (record: any, artistsMap: Map<string, SimpleArtist>): Track => {
-    const artistIds: string[] = record.fields.Исполнитель || [];
-    const artists = artistIds.map(id => artistsMap.get(id)).filter((a): a is SimpleArtist => !!a);
-
+const mapRecordToTrack = (record: any): Track => {
     return {
         id: record.id,
         title: record.fields.Название,
-        artists,
+        artistIds: record.fields.Исполнитель || [],
         lyrics: record.fields.Слова || '',
         audioUrl: record.fields.Аудио?.[0]?.url,
         cover: mapAttachmentToImageAsset(record.fields['Обложка трека']?.[0]) || fallbackImageAsset,
@@ -165,14 +162,38 @@ const mapRecordToTrack = (record: any, artistsMap: Map<string, SimpleArtist>): T
 // PUBLIC API
 // =================================================================================
 
-export const fetchTracks = async (): Promise<Track[]> => {
-    const [artistRecords, trackRecords] = await Promise.all([
-        getRecordsDirect(T.ARTISTS),
-        getRecordsDirect(T.TRACKS, { sort: [{ field: 'Название', direction: 'asc' }] })
-    ]);
-    const artistsMap = new Map(artistRecords.map(mapRecordToSimpleArtist).map(a => [a.id, a]));
-    return trackRecords.map(record => mapRecordToTrack(record, artistsMap));
+export const fetchAllTracks = async (): Promise<Track[]> => {
+    const trackRecords = await getRecordsDirect(T.TRACKS, { sort: [{ field: 'Название', direction: 'asc' }] });
+    return trackRecords.map(mapRecordToTrack);
 };
+
+export const fetchTracksByIds = async (trackIds: string[]): Promise<Track[]> => {
+    if (trackIds.length === 0) return [];
+    
+    const BATCH_SIZE = 90; // Airtable URL length limit is around 8KB, 90 record IDs is safe.
+    const fetchedTracks: Track[] = [];
+
+    for (let i = 0; i < trackIds.length; i += BATCH_SIZE) {
+        const batchIds = trackIds.slice(i, i + BATCH_SIZE);
+        const formula = `OR(${batchIds.map(id => `RECORD_ID()='${id}'`).join(',')})`;
+        try {
+            const records = await getRecordsDirect(T.TRACKS, { filterByFormula: formula });
+            fetchedTracks.push(...records.map(mapRecordToTrack));
+        } catch (error) {
+            console.error(`Failed to fetch batch of tracks:`, error);
+        }
+    }
+    
+    return fetchedTracks;
+};
+
+export const fetchPlaylistsByIds = async (playlistIds: string[]): Promise<Playlist[]> => {
+    if (playlistIds.length === 0) return [];
+    const formula = `OR(${playlistIds.map(id => `RECORD_ID()='${id}'`).join(',')})`;
+    const records = await getRecordsDirect(T.PLAYLISTS, { filterByFormula: formula });
+    return records.map(mapRecordToPlaylist);
+};
+
 
 export const fetchAllArtists = async (): Promise<SimpleArtist[]> => {
     const records = await getRecordsDirect(T.ARTISTS, { sort: [{ field: 'Имя', direction: 'asc' }] });
@@ -193,21 +214,33 @@ export const fetchSimpleArtistsByIds = async (artistIds: string[] = []): Promise
 
 export const fetchArtistDetails = async (artistId: string): Promise<Artist> => {
     const artistRecord = await getRecordByIdDirect(T.ARTISTS, artistId);
-    
-    const artistName = artistRecord.fields.Имя; 
-    const escapedArtistName = artistName.replace(/"/g, '""');
 
-    const [trackRecords, albumRecords, allArtistRecords] = await Promise.all([
-      getRecordsDirect(T.TRACKS, { filterByFormula: `FIND("${escapedArtistName}", ARRAYJOIN({Исполнитель}))` }),
-      getRecordsDirect(T.PLAYLISTS, { filterByFormula: `AND(FIND("${escapedArtistName}", ARRAYJOIN({Исполнитель})), ({Альбом/Плейлист} = 'альбом'))` }),
-      getRecordsDirect(T.ARTISTS)
+    // Directly use linked record IDs for massive performance gain.
+    const trackIds = artistRecord.fields.Треки || [];
+    const playlistIds = artistRecord.fields.плейлисты || [];
+
+    // Fetch tracks and playlists in parallel
+    const [artistTracks, allPlaylists] = await Promise.all([
+        fetchTracksByIds(trackIds),
+        fetchPlaylistsByIds(playlistIds),
     ]);
+    
+    // Filter playlists to only include albums
+    const artistAlbums = allPlaylists.filter(p => p.collectionType === 'альбом');
 
-    const artistsMap = new Map(allArtistRecords.map(mapRecordToSimpleArtist).map(a => [a.id, a]));
-    const artistTracks = trackRecords.map(r => mapRecordToTrack(r, artistsMap));
+    // Hydrate artists for the fetched tracks (important for collabs)
+    const allArtistIds = new Set<string>();
+    artistTracks.forEach(t => t.artistIds.forEach(id => allArtistIds.add(id)));
+    
+    const artists = await fetchSimpleArtistsByIds(Array.from(allArtistIds));
+    const artistsMap = new Map(artists.map(a => [a.id, a]));
+    artistTracks.forEach(t => {
+      t.artists = t.artistIds.map(id => artistsMap.get(id)).filter((a): a is SimpleArtist => !!a);
+    });
+
+    // Hydrate tracks within albums
     const artistTracksMap = new Map(artistTracks.map(t => [t.id, t]));
-
-    const populatedAlbums = albumRecords.map(mapRecordToPlaylist).map(album => ({
+    const populatedAlbums = artistAlbums.map(album => ({
       ...album,
       tracks: album.trackIds.map(id => artistTracksMap.get(id)).filter((t): t is Track => !!t)
     }));

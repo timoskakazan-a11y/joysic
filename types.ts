@@ -1,4 +1,5 @@
 
+
 export interface ImageAsset {
   full: string;
   large?: string;
@@ -8,7 +9,8 @@ export interface ImageAsset {
 export interface Track {
   id: string;
   title: string;
-  artists: SimpleArtist[];
+  artistIds: string[];
+  artists?: SimpleArtist[];
   lyrics: string;
   audioUrl: string;
   cover: ImageAsset;
@@ -59,4 +61,5 @@ export interface Playlist {
   collectionType: 'альбом' | 'плейлист';
   artistId?: string;
   releaseDate?: string;
+  isHydrated?: boolean;
 }
