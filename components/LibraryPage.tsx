@@ -1,5 +1,8 @@
 
 
+
+
+
 import React, { useState, useMemo, useCallback } from 'react';
 import type { User, Playlist, SimpleArtist, Track } from '../types';
 import { ShuffleIcon, SearchIcon, QrCodeIcon, SoundWaveIcon, MatBadge } from './IconComponents';
@@ -47,9 +50,9 @@ const PlaylistCard = React.memo<{ playlist: Playlist; onSelect: (playlist: Playl
     <div onClick={handleSelect} className={`group ${isUpcoming ? 'cursor-default' : 'cursor-pointer'}`}>
       <div className="relative aspect-square w-full rounded-2xl shadow-lg overflow-hidden bg-surface">
         {playlist.coverType === 'video' && playlist.coverVideoUrl ? (
-          <video src={playlist.coverVideoUrl} poster={playlist.coverUrl} autoPlay loop muted playsInline className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+          <video src={playlist.coverVideoUrl} poster={playlist.cover.full} autoPlay loop muted playsInline className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 smooth-hover" />
         ) : (
-          <img src={playlist.coverUrl} alt={playlist.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+          <TrackCover asset={playlist.cover} alt={playlist.name} className="w-full h-full transition-transform duration-500 group-hover:scale-110 smooth-hover" />
         )}
         {isUpcoming && (
             <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center text-center p-2">
@@ -73,8 +76,8 @@ const ArtistCard = React.memo<{ artist: SimpleArtist; onSelect: (id: string) => 
 
   return (
     <div onClick={handleSelect} className="group cursor-pointer flex-shrink-0 w-32 sm:w-36 md:w-40 text-center">
-      <div className="relative aspect-square w-full rounded-full shadow-lg overflow-hidden bg-surface transition-transform duration-300 group-hover:scale-105">
-        <img src={artist.photoUrl || 'https://i.postimg.cc/G3K2BYkT/joysic.png'} alt={artist.name} className="w-full h-full object-cover" />
+      <div className="relative aspect-square w-full rounded-full shadow-lg overflow-hidden bg-surface transition-transform duration-300 group-hover:scale-105 smooth-hover">
+        <TrackCover asset={artist.photo} alt={artist.name} className="w-full h-full" />
       </div>
       <div className="mt-3">
         <h3 className="font-bold text-primary truncate">{artist.name}</h3>
@@ -91,7 +94,7 @@ const SearchResultTrack = React.memo<{track: Track, isActive: boolean, isPlaying
         className={`flex items-center p-3 rounded-lg cursor-pointer transition-colors duration-200 group ${isActive ? 'bg-surface-light' : 'hover:bg-surface'}`}
       >
         <div className="relative w-12 h-12 rounded-md bg-surface overflow-hidden flex-shrink-0">
-          <TrackCover src={track.coverUrl} alt={track.title} className="w-full h-full" />
+          <TrackCover asset={track.cover} alt={track.title} className="w-full h-full" />
         </div>
         <div className="flex-grow mx-4 overflow-hidden">
           <p className={`font-semibold ${isActive ? 'text-accent' : 'text-text'}`}>
@@ -211,7 +214,7 @@ const LibraryPage: React.FC<LibraryPageProps> = ({ user, playlists, likedAlbums,
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
             <div 
               onClick={onShufflePlayAll} 
-              className="col-span-2 h-full cursor-pointer rounded-2xl shadow-lg bg-gradient-to-br from-accent to-purple-800 flex flex-col items-center justify-center text-center p-5 transition-all duration-300 ease-in-out hover:shadow-2xl hover:shadow-accent/40 hover:brightness-110"
+              className="col-span-2 h-full cursor-pointer rounded-2xl shadow-lg bg-gradient-to-br from-accent to-purple-800 flex flex-col items-center justify-center text-center p-5 transition-all duration-300 ease-in-out hover:shadow-2xl hover:shadow-accent/40 hover:brightness-110 smooth-hover"
               role="button"
               aria-label="Play all tracks on shuffle"
             >
@@ -262,10 +265,10 @@ const LibraryPage: React.FC<LibraryPageProps> = ({ user, playlists, likedAlbums,
           className="w-12 h-12 rounded-full overflow-hidden bg-surface-light hover:ring-2 hover:ring-accent transition-all"
           aria-label="Open profile"
         >
-            <img 
-                src={user.avatarUrl || 'https://i.postimg.cc/G3K2BYkT/joysic.png'} 
+            <TrackCover
+                asset={user.avatar} 
                 alt="User Avatar" 
-                className="w-full h-full object-cover" 
+                className="w-full h-full"
             />
         </button>
       </header>

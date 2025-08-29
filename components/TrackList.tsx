@@ -2,6 +2,7 @@
 import React from 'react';
 import type { Track } from '../types';
 import { SoundWaveIcon } from './IconComponents';
+import TrackCover from './TrackCover';
 
 interface TrackListProps {
   tracks: Track[];
@@ -26,8 +27,8 @@ const TrackList: React.FC<TrackListProps> = ({ tracks, currentTrackId, isPlaying
             role="button"
             tabIndex={0}
           >
-            <div className="relative">
-              <img src={track.coverUrl} alt={track.title} className="w-14 h-14 rounded-lg object-cover" />
+            <div className="relative w-14 h-14 rounded-lg overflow-hidden flex-shrink-0">
+              <TrackCover asset={track.cover} alt={track.title} className="w-full h-full" />
             </div>
             <div className="flex-grow mx-4">
               <p className={`font-bold ${isActive ? 'text-primary' : 'text-text'}`}>

@@ -1,8 +1,8 @@
 
-export interface Artwork {
-    src: string;
-    sizes: string;
-    type: string;
+export interface ImageAsset {
+  full: string;
+  large?: string;
+  small?: string;
 }
 
 export interface Track {
@@ -11,9 +11,7 @@ export interface Track {
   artists: SimpleArtist[];
   lyrics: string;
   audioUrl: string;
-  artwork: Artwork[];
-  coverUrl: string;
-  coverUrlType: string;
+  cover: ImageAsset;
   likes: number;
   listens: number;
   youtubeClipUrl?: string;
@@ -25,7 +23,7 @@ export interface Artist {
     name: string;
     description?: string;
     status?: string;
-    photoUrl?: string;
+    photo?: ImageAsset;
     tracks: Track[];
     albums: Playlist[];
 }
@@ -37,21 +35,21 @@ export interface User {
   likedTrackIds: string[];
   likedArtistIds: string[];
   favoriteCollectionIds: string[];
-  avatarUrl?: string;
+  avatar?: ImageAsset;
   totalListeningMinutes?: number;
 }
 
 export interface SimpleArtist {
   id: string;
   name: string;
-  photoUrl?: string;
+  photo?: ImageAsset;
 }
 
 export interface Playlist {
   id: string;
   name: string;
   description: string;
-  coverUrl: string;
+  cover: ImageAsset;
   coverVideoUrl?: string;
   coverType: 'image' | 'video';
   trackIds: string[];

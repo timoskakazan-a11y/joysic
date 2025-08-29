@@ -81,7 +81,7 @@ const Player: React.FC<PlayerProps> = ({ track, isPlaying, progress, onPlayPause
         key={track.id}
         className="absolute inset-[-40px] bg-cover bg-center transition-opacity duration-1000 ease-in-out"
         style={{
-          backgroundImage: `url(${track.coverUrl})`,
+          backgroundImage: `url(${track.cover.large || track.cover.full})`,
           filter: 'blur(32px)',
           opacity: bgOpacity,
         }}
@@ -123,7 +123,7 @@ const Player: React.FC<PlayerProps> = ({ track, isPlaying, progress, onPlayPause
           {/* Left Side: Cover Art (Tablet and up) */}
           <div className="relative w-64 h-64 sm:w-72 sm:h-72 md:w-80 md:h-80 lg:w-96 lg:h-96 flex-shrink-0 rounded-2xl bg-surface shadow-2xl shadow-black/30 my-8 md:my-0 overflow-hidden">
             <TrackCover
-              src={track.coverUrl} 
+              asset={track.cover} 
               alt={track.title} 
               className="absolute inset-0 w-full h-full"
             />

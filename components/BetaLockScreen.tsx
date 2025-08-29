@@ -1,10 +1,12 @@
 import React from 'react';
+import type { ImageAsset } from '../types';
+import TrackCover from './TrackCover';
 
 interface BetaLockScreenProps {
-  imageUrl: string | null;
+  imageAsset: ImageAsset | null;
 }
 
-const BetaLockScreen: React.FC<BetaLockScreenProps> = ({ imageUrl }) => {
+const BetaLockScreen: React.FC<BetaLockScreenProps> = ({ imageAsset }) => {
   return (
     <div className="min-h-screen bg-background text-text flex flex-col justify-center items-center p-6 text-center relative overflow-hidden">
       {/* Background glow effect */}
@@ -12,9 +14,9 @@ const BetaLockScreen: React.FC<BetaLockScreenProps> = ({ imageUrl }) => {
       
       <div className="relative w-full max-w-md bg-surface/70 backdrop-blur-xl p-8 sm:p-12 rounded-2xl shadow-2xl shadow-black/30 border border-surface-light animate-fadeInScaleUp">
         <div className="flex flex-col items-center">
-          {imageUrl ? (
-            <img 
-              src={imageUrl} 
+          {imageAsset ? (
+            <TrackCover
+              asset={imageAsset}
               alt="Бета-тест" 
               className="w-56 h-56 mx-auto mb-8 drop-shadow-[0_10px_15px_rgba(187,134,252,0.15)] animate-breathing"
             />

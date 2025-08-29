@@ -2,6 +2,7 @@
 import React from 'react';
 import type { Track } from '../types';
 import { MusicNoteIcon, TextIcon, UserIcon, PlayIcon, PauseIcon, SoundWaveIcon } from './IconComponents';
+import TrackCover from './TrackCover';
 
 interface MusicTableProps {
   tracks: Track[];
@@ -53,7 +54,7 @@ const MusicTable: React.FC<MusicTableProps> = ({ tracks, currentTrackId, isPlayi
                   </button>
                 </div>
                 <div className={`col-span-4 flex items-center gap-3 ${isActive ? 'text-primary font-semibold' : 'text-white'}`}>
-                    <img src={track.coverUrl} alt={track.title} className="w-10 h-10 rounded-md object-cover"/>
+                    <TrackCover asset={track.cover} alt={track.title} className="w-10 h-10 rounded-md" />
                     <span>{track.title}</span>
                 </div>
                 <div className="col-span-3 text-slate-300 truncate">{track.artists.map(a => a.name).join(', ')}</div>

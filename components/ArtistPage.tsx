@@ -1,13 +1,13 @@
 
 
+
+
+
 import React, { useState, useEffect, useMemo } from 'react';
 import type { Artist, Playlist, Track } from '../types';
 import { PlayIcon, HeartIcon, ChevronLeftIcon, SoundWaveIcon, MatBadge } from './IconComponents';
 import TrackCover from './TrackCover';
-
-const AnimatedPlaceholder: React.FC<{ className?: string }> = ({ className }) => (
-    <div className={`bg-surface-light animate-pulse ${className}`} />
-);
+import AlbumCard from './AlbumCard';
 
 interface ArtistPageProps {
   artist: Artist;
@@ -24,7 +24,7 @@ interface ArtistPageProps {
 }
 
 const ArtistPage: React.FC<ArtistPageProps> = ({ artist, onBack, onPlayTrack, onSelectPlaylist, currentTrackId, isPlaying, likedArtistIds, likedTrackIds, favoriteCollectionIds, onToggleLike, onOpenMatInfo }) => {
-  const [isImageLoaded, setIsImageLoaded] = useState(false);
+  const [isBgLoaded, setIsBgLoaded] = useState(false);
   const isLiked = likedArtistIds.includes(artist.id);
 
   const sortedTracks = useMemo(() => 
@@ -51,23 +51,24 @@ const ArtistPage: React.FC<ArtistPageProps> = ({ artist, onBack, onPlayTrack, on
 
 
   useEffect(() => {
-    setIsImageLoaded(false); 
-    if (artist.photoUrl) {
+    setIsBgLoaded(false); 
+    const photoUrl = artist.photo?.large || artist.photo?.full;
+    if (photoUrl) {
       const img = new Image();
-      img.src = artist.photoUrl;
-      img.onload = () => setIsImageLoaded(true);
-      img.onerror = () => setIsImageLoaded(true);
+      img.src = photoUrl;
+      img.onload = () => setIsBgLoaded(true);
+      img.onerror = () => setIsBgLoaded(true); // Still show content on error
     } else {
-      setIsImageLoaded(true); 
+      setIsBgLoaded(true); 
     }
-  }, [artist.photoUrl]);
+  }, [artist.photo]);
 
   return (
     <div className="min-h-screen bg-background text-text font-sans">
       <div className="absolute top-0 left-0 w-full h-72 md:h-96">
-        {isImageLoaded && artist.photoUrl && (
+        {isBgLoaded && artist.photo?.full && (
           <>
-            <img src={artist.photoUrl} alt="" className="w-full h-full object-cover opacity-30 blur-xl" aria-hidden="true"/>
+            <img src={artist.photo.large || artist.photo.full} alt="" className="w-full h-full object-cover opacity-30 blur-xl" aria-hidden="true"/>
             <div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-transparent"></div>
           </>
         )}
@@ -82,15 +83,11 @@ const ArtistPage: React.FC<ArtistPageProps> = ({ artist, onBack, onPlayTrack, on
         </button>
         <header className="flex flex-col md:flex-row items-center gap-6 md:gap-10 mb-8 mt-16 md:mt-24">
             <div className="relative w-40 h-40 md:w-48 md:h-48 rounded-full bg-surface shadow-lg overflow-hidden flex-shrink-0 border-4 border-background">
-                {!isImageLoaded && <AnimatedPlaceholder className="rounded-full w-full h-full" />}
-                {artist.photoUrl && (
-                     <img 
-                        src={artist.photoUrl} 
-                        alt={artist.name} 
-                        className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${isImageLoaded ? 'opacity-100' : 'opacity-0'}`}
-                        onLoad={() => setIsImageLoaded(true)}
-                    />
-                )}
+                <TrackCover 
+                    asset={artist.photo}
+                    alt={artist.name} 
+                    className="absolute inset-0 w-full h-full"
+                />
             </div>
             <div className="text-center md:text-left">
                 <h1 className="text-4xl sm:text-6xl font-black tracking-tight text-primary mb-2">
@@ -118,57 +115,15 @@ const ArtistPage: React.FC<ArtistPageProps> = ({ artist, onBack, onPlayTrack, on
             <div className="mt-12">
                 <h2 className="text-2xl font-bold text-primary mb-4">Альбомы</h2>
                 <div className="flex gap-6 overflow-x-auto pb-4 -mx-4 sm:-mx-6 px-4 sm:px-6">
-                    {sortedAlbums.map(album => {
-                        const isAlbumLiked = favoriteCollectionIds.includes(album.id);
-                        const releaseDate = album.releaseDate ? new Date(album.releaseDate) : null;
-                        const isUpcoming = releaseDate && releaseDate > new Date();
-                        const releaseYear = releaseDate ? releaseDate.getFullYear() : null;
-                        const formattedReleaseDate = releaseDate
-                            ? releaseDate.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' })
-                            : '';
-
-                        const handleAlbumClick = () => {
-                          if (!isUpcoming) {
-                            onSelectPlaylist(album);
-                          }
-                        };
-
-                        return (
-                        <div key={album.id} className="group w-40 sm:w-48 flex-shrink-0">
-                            <div className={`relative aspect-square w-full rounded-2xl shadow-lg overflow-hidden bg-surface ${isUpcoming ? 'cursor-default' : 'cursor-pointer'}`} onClick={handleAlbumClick}>
-                                {album.coverType === 'video' && album.coverVideoUrl ? (
-                                    <video src={album.coverVideoUrl} poster={album.coverUrl} autoPlay loop muted playsInline className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
-                                ) : (
-                                    <img src={album.coverUrl} alt={album.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
-                                )}
-                                {isUpcoming ? (
-                                    <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center text-center p-2">
-                                        <p className="font-bold text-primary text-lg">Скоро выйдет</p>
-                                        <p className="text-sm text-text-secondary">{formattedReleaseDate}</p>
-                                    </div>
-                                ) : (
-                                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                                )}
-                            </div>
-                            <div className="mt-3 flex justify-between items-start">
-                                <div className="overflow-hidden mr-2">
-                                    <h3 className={`font-bold text-primary truncate ${isUpcoming ? '' : 'cursor-pointer'}`} onClick={handleAlbumClick}>{album.name}</h3>
-                                    <p className="text-sm text-text-secondary">
-                                      {releaseYear ? `${releaseYear} • ` : ''}{album.tracks.length} треков
-                                    </p>
-                                </div>
-                                {!isUpcoming && (
-                                    <button
-                                      onClick={() => onToggleLike('album', album.id)}
-                                      className={`${isAlbumLiked ? 'text-accent' : 'text-text-secondary'} hover:text-primary transition-colors p-1 -mr-1 flex-shrink-0`}
-                                      aria-label={isAlbumLiked ? 'Убрать лайк с альбома' : 'Поставить лайк на альбом'}
-                                    >
-                                        <HeartIcon filled={isAlbumLiked} className="w-5 h-5" />
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-                    )})}
+                    {sortedAlbums.map(album => (
+                        <AlbumCard
+                            key={album.id}
+                            album={album}
+                            isLiked={favoriteCollectionIds.includes(album.id)}
+                            onSelect={onSelectPlaylist}
+                            onToggleLike={() => onToggleLike('album', album.id)}
+                        />
+                    ))}
                 </div>
             </div>
         )}
@@ -200,7 +155,7 @@ const ArtistPage: React.FC<ArtistPageProps> = ({ artist, onBack, onPlayTrack, on
                     )}
                 </div>
                 <div className="relative w-12 h-12 rounded-md bg-surface overflow-hidden flex-shrink-0">
-                  <TrackCover src={track.coverUrl} alt={track.title} className="w-full h-full" />
+                  <TrackCover asset={track.cover} alt={track.title} className="w-full h-full" />
                 </div>
                 <div className="flex-grow mx-4 overflow-hidden">
                   <p className={`font-semibold ${isActive ? 'text-accent' : 'text-text'}`}>

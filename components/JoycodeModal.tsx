@@ -3,6 +3,7 @@ import React from 'react';
 import type { Track } from '../types';
 import Barcode from './Barcode';
 import { CloseIcon } from './IconComponents';
+import TrackCover from './TrackCover';
 
 interface JoycodeModalProps {
   track: Track;
@@ -19,7 +20,7 @@ const JoycodeModal: React.FC<JoycodeModalProps> = ({ track, onClose }) => {
       <div 
         className="absolute inset-0 bg-cover bg-center transition-opacity duration-500"
         style={{
-          backgroundImage: `url(${track.coverUrl})`,
+          backgroundImage: `url(${track.cover.large || track.cover.full})`,
           filter: 'blur(24px)',
         }}
       />
@@ -39,8 +40,8 @@ const JoycodeModal: React.FC<JoycodeModalProps> = ({ track, onClose }) => {
         </button>
 
         <div className="p-8 flex flex-col items-center gap-6">
-            <img 
-              src={track.coverUrl} 
+            <TrackCover
+              asset={track.cover}
               alt={track.title} 
               className="w-40 h-40 object-cover rounded-2xl mx-auto shadow-lg"
             />

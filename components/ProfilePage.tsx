@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { User } from '../types';
+import { User, ImageAsset } from '../types';
 import { ChevronLeftIcon, HeartIcon, UserIcon, MusicNoteIcon } from './IconComponents';
-import { fetchMediaUrl } from '../services/airtableService';
+import { fetchMediaAsset } from '../services/airtableService';
+import TrackCover from './TrackCover';
 
 interface ProfilePageProps {
   user: User;
@@ -37,11 +38,11 @@ const StatItem: React.FC<{ icon: React.ReactNode, value: number, label: string }
 );
 
 const ProfilePage: React.FC<ProfilePageProps> = ({ user, stats, onBack, onLogout }) => {
-    const [monkeyImageUrl, setMonkeyImageUrl] = useState<string | null>(null);
+    const [monkeyImageAsset, setMonkeyImageAsset] = useState<ImageAsset | null>(null);
     const { hours, minutes } = formatListeningTime(user.totalListeningMinutes);
 
     useEffect(() => {
-        fetchMediaUrl('Обезьяна').then(setMonkeyImageUrl);
+        fetchMediaAsset('Обезьяна').then(setMonkeyImageAsset);
     }, []);
 
     return (
@@ -60,8 +61,8 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, stats, onBack, onLogout
             <main className="max-w-md md:max-w-2xl lg:max-w-3xl mx-auto">
                 <div className="flex flex-col items-center mb-8">
                     <div className="relative w-32 h-32 rounded-full mb-4 shadow-lg">
-                         <img 
-                            src={user.avatarUrl || 'https://i.postimg.cc/G3K2BYkT/joysic.png'} 
+                         <TrackCover
+                            asset={user.avatar} 
                             alt="User Avatar" 
                             className="w-full h-full object-cover rounded-full border-4 border-surface-light" 
                         />
@@ -72,10 +73,10 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, stats, onBack, onLogout
                 {/* Time Card with GIF */}
                 <div className="bg-surface rounded-2xl shadow-lg p-4 sm:p-6 flex items-center gap-4 sm:gap-6 mb-6">
                     {/* Left side: GIF */}
-                    {monkeyImageUrl && (
+                    {monkeyImageAsset && (
                         <div className="w-20 h-20 sm:w-28 sm:h-28 flex-shrink-0 rounded-2xl overflow-hidden bg-surface-light">
-                            <img
-                                src={monkeyImageUrl}
+                            <TrackCover
+                                asset={monkeyImageAsset}
                                 alt="Decorative animation"
                                 className="w-full h-full object-cover"
                             />

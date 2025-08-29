@@ -1,5 +1,7 @@
 
 
+
+
 import React, { useMemo } from 'react';
 import type { Playlist, Track } from '../types';
 import { PlayIcon, PauseIcon, ChevronLeftIcon, SoundWaveIcon, HeartIcon, MatBadge } from './IconComponents';
@@ -44,7 +46,7 @@ const PlaylistDetailPage: React.FC<PlaylistDetailPageProps> = ({ playlist, onBac
   return (
     <div className="min-h-screen bg-background text-text font-sans">
        <div className="absolute top-0 left-0 w-full h-72 md:h-96">
-          <img src={playlist.coverUrl} alt="" className="w-full h-full object-cover opacity-30 blur-xl" aria-hidden="true"/>
+          <img src={playlist.cover.large || playlist.cover.full} alt="" className="w-full h-full object-cover opacity-30 blur-xl" aria-hidden="true"/>
           <div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-transparent"></div>
       </div>
       <main className="relative max-w-4xl mx-auto p-4 sm:p-6 z-10">
@@ -58,9 +60,9 @@ const PlaylistDetailPage: React.FC<PlaylistDetailPageProps> = ({ playlist, onBac
         <header className="flex flex-col md:flex-row items-center md:items-start gap-6 md:gap-10 mb-8 mt-16 md:mt-24">
             <div className="relative w-40 h-40 md:w-48 md:h-48 rounded-2xl bg-surface shadow-lg overflow-hidden flex-shrink-0 border-4 border-background">
                 {playlist.coverType === 'video' && playlist.coverVideoUrl ? (
-                    <video src={playlist.coverVideoUrl} poster={playlist.coverUrl} autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover" />
+                    <video src={playlist.coverVideoUrl} poster={playlist.cover.full} autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover" />
                 ) : (
-                    <img src={playlist.coverUrl} alt={playlist.name} className="absolute inset-0 w-full h-full object-cover" />
+                    <TrackCover asset={playlist.cover} alt={playlist.name} className="absolute inset-0 w-full h-full" />
                 )}
             </div>
             <div className="text-center md:text-left flex flex-col md:h-48">
@@ -125,7 +127,7 @@ const PlaylistDetailPage: React.FC<PlaylistDetailPageProps> = ({ playlist, onBac
                     )}
                 </div>
                 <div className="relative w-12 h-12 rounded-md bg-surface overflow-hidden flex-shrink-0">
-                  <TrackCover src={track.coverUrl} alt={track.title} className="w-full h-full" />
+                  <TrackCover asset={track.cover} alt={track.title} className="w-full h-full" />
                 </div>
                 <div className="flex-grow mx-4 overflow-hidden">
                   <p className={`font-semibold ${isActive ? 'text-accent' : 'text-text'}`}>

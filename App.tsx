@@ -1,9 +1,6 @@
-
-
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { fetchTracks, fetchArtistDetails, loginUser, registerUser, updateUserLikes, fetchPlaylistsForUser, incrementTrackStats, fetchBetaImage, fetchSimpleArtistsByIds, updateUserListeningTime, fetchAllArtists, fetchAllCollections } from './services/airtableService';
-import type { Track, Artist, User, Playlist, SimpleArtist } from './types';
+import { fetchTracks, fetchArtistDetails, loginUser, registerUser, updateUserLikes, fetchPlaylistsForUser, incrementTrackStats, fetchMediaAsset, fetchSimpleArtistsByIds, updateUserListeningTime, fetchAllArtists, fetchAllCollections } from './services/airtableService';
+import type { Track, Artist, User, Playlist, SimpleArtist, ImageAsset } from './types';
 import Player from './components/Player';
 import ArtistPage from './components/ArtistPage';
 import MiniPlayer from './components/MiniPlayer';
@@ -15,6 +12,7 @@ import BetaLockScreen from './components/BetaLockScreen';
 import ScannerModal from './components/ScannerModal';
 import ProfilePage from './components/ProfilePage';
 import MatInfoModal from './components/MatInfoModal';
+import ArtistPageLoader from './components/ArtistPageLoader';
 
 interface AppConfig {
   BETA_LOCK_MODE: 'on' | 'off';
@@ -27,13 +25,12 @@ const config: AppConfig = {
 // FIX: Added a return statement with the application's JSX structure, resolving the error where the component was returning 'void'.
 const App: React.FC = () => {
   const [isBetaLocked, setIsBetaLocked] = useState(false);
-  const [betaImageUrl, setBetaImageUrl] = useState<string | null>(null);
+  const [betaImageAsset, setBetaImageAsset] = useState<ImageAsset | null>(null);
   const [isCheckingBeta, setIsCheckingBeta] = useState(true);
 
   const [user, setUser] = useState<User | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
   
-  const [favoritesPlaylistId, setFavoritesPlaylistId] = useState<string | undefined>();
   const [tracks, setTracks] = useState<Track[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [likedAlbums, setLikedAlbums] = useState<Playlist[]>([]);
@@ -58,24 +55,19 @@ const App: React.FC = () => {
   const [isMatInfoModalOpen, setIsMatInfoModalOpen] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const playerSyncInterval = useRef<ReturnType<typeof setInterval> | null>(null);
   
   const currentTrack = currentTrackIndex !== null && shuffledTracks.length > 0 ? shuffledTracks[currentTrackIndex] : null;
-
-  const userRef = useRef(user);
-  useEffect(() => { userRef.current = user; }, [user]);
-
 
   useEffect(() => {
     const checkBetaStatus = async () => {
       if (config.BETA_LOCK_MODE === 'on' && window.location.hostname === 'joysic.netlify.app') {
         setIsBetaLocked(true);
         try {
-          const url = await fetchBetaImage();
-          setBetaImageUrl(url || 'https://i.postimg.cc/T3N3W0h1/beta-lock.png');
+          const asset = await fetchMediaAsset('beta-lock');
+          setBetaImageAsset(asset || { full: 'https://i.postimg.cc/T3N3W0h1/beta-lock.png' });
         } catch (error) {
           console.error("Failed to fetch beta image, using fallback.", error);
-          setBetaImageUrl('https://i.postimg.cc/T3N3W0h1/beta-lock.png');
+          setBetaImageAsset({ full: 'https://i.postimg.cc/T3N3W0h1/beta-lock.png' });
         }
       } else {
         setIsBetaLocked(false);
@@ -106,33 +98,30 @@ const App: React.FC = () => {
   
   // Effect for tracking listening time in the background
   useEffect(() => {
-    if (playerSyncInterval.current) {
-      clearInterval(playerSyncInterval.current);
+    if (!isPlaying) {
+        return; // No need for interval if not playing
     }
 
-    if (isPlaying) {
-      playerSyncInterval.current = setInterval(() => {
-        const currentUser = userRef.current;
+    const interval = setInterval(() => {
+        // Use functional update to avoid stale state and dependency issues
+        setUser(currentUser => {
+            if (!currentUser) return null;
 
-        if (!currentUser) return;
+            const newTotalMinutes = (currentUser.totalListeningMinutes || 0) + (5 / 60);
+            const updatedUser: User = { ...currentUser, totalListeningMinutes: newTotalMinutes };
 
-        // Increment time and update user ref without causing a re-render
-        const newTotalMinutes = (currentUser.totalListeningMinutes || 0) + (5 / 60);
-        const updatedUserForStorage: User = { ...currentUser, totalListeningMinutes: newTotalMinutes };
-        userRef.current = updatedUserForStorage;
-        localStorage.setItem('joysicUser', JSON.stringify(updatedUserForStorage));
-        
-        updateUserListeningTime(currentUser.id, newTotalMinutes).catch(err => {
-          console.error("Failed to sync listening time:", err);
+            // Side effects: update storage and backend
+            localStorage.setItem('joysicUser', JSON.stringify(updatedUser));
+            updateUserListeningTime(updatedUser.id, newTotalMinutes).catch(err => {
+                console.error("Failed to sync listening time:", err);
+            });
+
+            return updatedUser;
         });
-      }, 5000); // Sync every 5 seconds
-    }
+    }, 5000); // Sync every 5 seconds
 
-    return () => {
-      if (playerSyncInterval.current) {
-        clearInterval(playerSyncInterval.current);
-      }
-    };
+    // Cleanup function to clear interval
+    return () => clearInterval(interval);
   }, [isPlaying]);
 
   const loadData = useCallback(async () => {
@@ -170,14 +159,6 @@ const App: React.FC = () => {
       setPlaylists(populatedPlaylists);
       setLikedAlbums(populatedLikedAlbums);
       setLikedArtists(fetchedLikedArtists);
-      setFavoritesPlaylistId(fetchedPlaylistsData.favoritesPlaylistId);
-
-      const favoritesPlaylist = populatedPlaylists.find(p => p.id === fetchedPlaylistsData.favoritesPlaylistId);
-      if (favoritesPlaylist) {
-        const updatedUser = { ...user, likedTrackIds: favoritesPlaylist.trackIds };
-        setUser(updatedUser);
-        localStorage.setItem('joysicUser', JSON.stringify(updatedUser));
-      }
 
     } catch (err: any) {
       setError(err.message || 'Failed to load data.');
@@ -193,31 +174,40 @@ const App: React.FC = () => {
     }
   }, [user, isAuthLoading, loadData]);
 
+  // Consolidated effect for audio playback management
   useEffect(() => {
-    if (currentTrack && audioRef.current) {
-      const currentSrc = audioRef.current.currentSrc;
-      const newSrc = currentTrack.audioUrl;
-      
-      if (!currentSrc || !currentSrc.endsWith(encodeURI(newSrc.substring(newSrc.lastIndexOf('/') + 1)))) {
-          audioRef.current.src = newSrc;
-      }
-      
-      if (isPlaying) {
-        audioRef.current.play().catch(e => console.error("Error auto-playing track:", e));
-      }
-    }
-  }, [currentTrack, isPlaying]);
+      const audio = audioRef.current;
+      if (!audio) return;
 
-  useEffect(() => {
-      if (audioRef.current && currentTrack) {
+      if (currentTrack) {
+          // Handle source change if necessary
+          if (audio.src !== currentTrack.audioUrl) {
+              audio.src = currentTrack.audioUrl;
+          }
+
+          // Handle play/pause state
           if (isPlaying) {
-              audioRef.current.play().catch(e => console.error("Error playing audio:", e));
+              const playPromise = audio.play();
+              if (playPromise !== undefined) {
+                  playPromise.catch(error => {
+                      // Ignore AbortError which is a result of rapid play/pause, not a real error.
+                      if (error.name !== 'AbortError') {
+                          console.error("Error playing audio:", error);
+                      }
+                  });
+              }
           } else {
-              audioRef.current.pause();
+              audio.pause();
+          }
+      } else {
+          // If there's no track, ensure it's paused and source is cleared
+          audio.pause();
+          if (audio.src) {
+              audio.src = '';
           }
       }
-  }, [isPlaying, currentTrack?.id]);
-  
+  }, [currentTrack, isPlaying]); // Re-run whenever the track or play state changes
+
   useEffect(() => {
       if (scannedTrackId) {
           playTrackById(scannedTrackId);
@@ -370,7 +360,7 @@ const App: React.FC = () => {
 
     setUser(updatedUser);
     localStorage.setItem('joysicUser', JSON.stringify(updatedUser));
-    await updateUserLikes(user, updates, favoritesPlaylistId).catch(err => {
+    await updateUserLikes(user, updates).catch(err => {
       console.error("Failed to sync likes", err);
       // Revert optimistic update on failure
       setUser(user);
@@ -435,7 +425,7 @@ const App: React.FC = () => {
   }
 
   if (isBetaLocked) {
-    return <BetaLockScreen imageUrl={betaImageUrl} />;
+    return <BetaLockScreen imageAsset={betaImageAsset} />;
   }
 
   if (isAuthLoading) {
@@ -444,6 +434,21 @@ const App: React.FC = () => {
   
   if (!user) {
     return <AuthPage onLogin={handleLogin} onRegister={handleRegister} />;
+  }
+
+  if (error) {
+    return (
+      <div className="bg-background min-h-screen flex flex-col items-center justify-center p-4 text-center">
+        <h1 className="text-4xl font-black text-primary mb-4">Что-то пошло не так</h1>
+        <p className="text-text-secondary mb-8 max-w-sm">{error}</p>
+        <button 
+          onClick={() => loadData()}
+          className="bg-accent text-background font-bold py-3 px-6 rounded-full hover:bg-opacity-80 transition-colors"
+        >
+          Попробовать снова
+        </button>
+      </div>
+    );
   }
 
   if (isLoading && !tracks.length) {
@@ -473,20 +478,24 @@ const App: React.FC = () => {
             onOpenMatInfo={() => setIsMatInfoModalOpen(true)}
           />
         )}
-        {view === 'artist' && selectedArtist && !isArtistLoading && (
-          <ArtistPage
-            artist={selectedArtist}
-            onBack={() => setView('library')}
-            onPlayTrack={(trackId) => playTrackById(trackId, selectedArtist.tracks)}
-            onSelectPlaylist={handleSelectPlaylist}
-            currentTrackId={currentTrack?.id}
-            isPlaying={isPlaying}
-            likedArtistIds={user.likedArtistIds}
-            likedTrackIds={user.likedTrackIds}
-            favoriteCollectionIds={user.favoriteCollectionIds}
-            onToggleLike={handleToggleLike}
-            onOpenMatInfo={() => setIsMatInfoModalOpen(true)}
-          />
+        {view === 'artist' && (
+          isArtistLoading ? (
+            <ArtistPageLoader />
+          ) : selectedArtist ? (
+            <ArtistPage
+              artist={selectedArtist}
+              onBack={() => setView('library')}
+              onPlayTrack={(trackId) => playTrackById(trackId, selectedArtist.tracks)}
+              onSelectPlaylist={handleSelectPlaylist}
+              currentTrackId={currentTrack?.id}
+              isPlaying={isPlaying}
+              likedArtistIds={user.likedArtistIds}
+              likedTrackIds={user.likedTrackIds}
+              favoriteCollectionIds={user.favoriteCollectionIds}
+              onToggleLike={handleToggleLike}
+              onOpenMatInfo={() => setIsMatInfoModalOpen(true)}
+            />
+          ) : null
         )}
         {view === 'playlistDetail' && selectedPlaylist && (
           <PlaylistDetailPage
