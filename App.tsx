@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { fetchAllTracks, fetchArtistDetails, loginUser, registerUser, updateUserLikes, fetchPlaylistsForUser, incrementTrackStats, fetchMediaAsset, fetchSimpleArtistsByIds, updateUserListeningTime, fetchAllArtists, fetchAllCollections, fetchTracksByIds, fetchPlaylistsByIds } from './services/airtableService';
 import type { Track, Artist, User, Playlist, SimpleArtist, ImageAsset } from './types';
@@ -30,12 +31,14 @@ const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
   
-  const [tracks, setTracks] = useState<Track[]>([]);
-  const [playlists, setPlaylists] = useState<Playlist[]>([]);
-  const [likedAlbums, setLikedAlbums] = useState<Playlist[]>([]);
-  const [likedArtists, setLikedArtists] = useState<SimpleArtist[]>([]);
-  const [allArtists, setAllArtists] = useState<SimpleArtist[]>([]);
-  const [allCollections, setAllCollections] = useState<Playlist[]>([]);
+  const [tracks, setTracks] = useState<Record<string, Track>>({});
+  const [artists, setArtists] = useState<Record<string, SimpleArtist>>({});
+  const [collections, setCollections] = useState<Record<string, Playlist>>({});
+
+  const [userPlaylistIds, setUserPlaylistIds] = useState<string[]>([]);
+  const [userLikedAlbumIds, setUserLikedAlbumIds] = useState<string[]>([]);
+  const [userLikedArtistIds, setUserLikedArtistIds] = useState<string[]>([]);
+
   const [shuffledTracks, setShuffledTracks] = useState<Track[]>([]);
   const [currentTrackIndex, setCurrentTrackIndex] = useState<number | null>(null);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
@@ -48,7 +51,7 @@ const App: React.FC = () => {
 
   const [view, setView] = useState<'library' | 'artist' | 'playlistDetail' | 'profile'>('library');
   const [selectedArtist, setSelectedArtist] = useState<Artist | null>(null);
-  const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | null>(null);
+  const [selectedPlaylistId, setSelectedPlaylistId] = useState<string | null>(null);
   const [isArtistLoading, setIsArtistLoading] = useState<boolean>(false);
   const [isPlayerExpanded, setIsPlayerExpanded] = useState<boolean>(false);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
@@ -139,26 +142,31 @@ const App: React.FC = () => {
         essentialTracks.forEach(t => t.artistIds.forEach(id => essentialArtistIds.add(id)));
         
         const essentialArtists = await fetchSimpleArtistsByIds(Array.from(essentialArtistIds));
-        const artistsMap = new Map(essentialArtists.map(a => [a.id, a]));
         
-        const hydrateTracks = (tracksToHydrate: Track[]) => {
-            tracksToHydrate.forEach(t => {
-                t.artists = t.artistIds.map(id => artistsMap.get(id)).filter((a): a is SimpleArtist => !!a);
-            });
-        };
-        hydrateTracks(essentialTracks);
+        const newArtists = { ...artists };
+        essentialArtists.forEach(a => newArtists[a.id] = a);
+        fetchedLikedArtists.forEach(a => newArtists[a.id] = a);
 
-        const essentialTracksMap = new Map(essentialTracks.map(t => [t.id, t]));
-        const populate = (p: Playlist): Playlist => ({
-            ...p,
-            tracks: p.trackIds.map(id => essentialTracksMap.get(id)).filter((t): t is Track => !!t),
-            isHydrated: true,
+        const newTracks = { ...tracks };
+        essentialTracks.forEach(t => {
+            newTracks[t.id] = {
+                ...t,
+                artists: t.artistIds.map(id => newArtists[id]).filter(Boolean)
+            };
         });
+        
+        const newCollections = { ...collections };
+        fetchedPlaylistsData.playlists.forEach(p => newCollections[p.id] = { ...p, tracks: p.trackIds.map(id => newTracks[id]).filter(Boolean), isHydrated: true });
+        fetchedPlaylistsData.likedAlbums.forEach(p => newCollections[p.id] = { ...p, tracks: p.trackIds.map(id => newTracks[id]).filter(Boolean), isHydrated: true });
+        
+        setArtists(newArtists);
+        setTracks(newTracks);
+        setCollections(newCollections);
+        
+        setUserPlaylistIds(fetchedPlaylistsData.playlists.map(p => p.id));
+        setUserLikedAlbumIds(fetchedPlaylistsData.likedAlbums.map(p => p.id));
+        setUserLikedArtistIds(fetchedLikedArtists.map(a => a.id));
 
-        setPlaylists(fetchedPlaylistsData.playlists.map(populate));
-        setLikedAlbums(fetchedPlaylistsData.likedAlbums.map(populate));
-        setLikedArtists(fetchedLikedArtists);
-        setTracks(essentialTracks);
         setIsLoading(false);
 
         // STAGE 2: Hydrate the full library in the background for search
@@ -169,14 +177,31 @@ const App: React.FC = () => {
             fetchAllCollections(),
         ]);
         
-        const fullArtistsMap = new Map(allArtistRecords.map(a => [a.id, a]));
-        allFetchedTracks.forEach(t => {
-            t.artists = t.artistIds.map(id => fullArtistsMap.get(id)).filter((a): a is SimpleArtist => !!a);
+        setArtists(prev => {
+            const updated = { ...prev };
+            allArtistRecords.forEach(a => updated[a.id] = a);
+            return updated;
         });
-        
-        setAllArtists(allArtistRecords);
-        setTracks(allFetchedTracks);
-        setAllCollections(fetchedAllCollections);
+
+        setCollections(prev => {
+            const updated = { ...prev };
+            fetchedAllCollections.forEach(c => {
+                if (!updated[c.id]) updated[c.id] = c;
+            });
+            return updated;
+        });
+
+        setTracks(prev => {
+            const updated = { ...prev };
+            allFetchedTracks.forEach(t => {
+                 updated[t.id] = {
+                     ...t,
+                     artists: t.artistIds.map(id => artists[id]).filter(Boolean)
+                 };
+            });
+            return updated;
+        });
+
         setIsLibraryHydrating(false);
 
     } catch (err: any) {
@@ -247,13 +272,14 @@ const App: React.FC = () => {
 
   useEffect(() => {
       if (scannedTrackId) {
-          playTrackById(scannedTrackId);
+          const allTracksArray = Object.values(tracks);
+          playTrackById(scannedTrackId, allTracksArray);
           setScannedTrackId(null);
       }
   }, [scannedTrackId, tracks]);
 
   const playTrackById = (trackId: string, playlistContext?: Track[]) => {
-      const sourceTracks = playlistContext || tracks;
+      const sourceTracks = playlistContext || Object.values(tracks);
       const trackIndex = sourceTracks.findIndex(t => t.id === trackId);
       if (trackIndex !== -1) {
           setShuffledTracks(sourceTracks);
@@ -263,18 +289,14 @@ const App: React.FC = () => {
 
           const track = sourceTracks[trackIndex];
           incrementTrackStats(track.id, 'Прослушивания', track.listens, 1).catch(err => console.error("Failed to increment listens", err));
-          setTracks(prev => prev.map(t => t.id === trackId ? {...t, listens: t.listens + 1} : t));
+          setTracks(prev => ({...prev, [trackId]: {...prev[trackId], listens: prev[trackId].listens + 1}}));
       } else {
           console.warn(`Track with id ${trackId} not found.`);
       }
   };
 
   const handleSelectPlaylist = (playlist: Playlist) => {
-    const populatedPlaylist = {
-        ...playlist,
-        tracks: playlist.trackIds.map(id => tracks.find(t => t.id === id)).filter((t): t is Track => !!t)
-    };
-    setSelectedPlaylist(populatedPlaylist);
+    setSelectedPlaylistId(playlist.id);
     setView('playlistDetail');
   };
 
@@ -283,7 +305,22 @@ const App: React.FC = () => {
       setView('artist');
       try {
           const artistDetails = await fetchArtistDetails(artistId);
-          setSelectedArtist(artistDetails);
+          
+          const hydratedTracks = artistDetails.tracks.map(t => ({
+              ...t,
+              artists: t.artistIds.map(id => artists[id]).filter(Boolean)
+          }));
+          const hydratedAlbums = artistDetails.albums.map(a => ({
+            ...a,
+            tracks: a.trackIds.map(id => tracks[id]).filter(Boolean)
+          }));
+
+          setSelectedArtist({
+            ...artistDetails,
+            tracks: hydratedTracks,
+            albums: hydratedAlbums
+          });
+
       } catch (error) {
           console.error("Failed to fetch artist details", error);
           setError(`Failed to fetch artist details: ${error instanceof Error ? error.message : String(error)}`);
@@ -362,10 +399,10 @@ const App: React.FC = () => {
         updatedUser = { ...user, likedTrackIds: newLikedTrackIds };
         updates.likedTrackIds = newLikedTrackIds;
         
-        const track = tracks.find(t => t.id === id);
+        const track = tracks[id];
         if (track) {
             const newLikes = track.likes + (isLiked ? -1 : 1);
-            setTracks(prev => prev.map(t => t.id === id ? {...t, likes: newLikes} : t));
+            setTracks(prev => ({...prev, [id]: {...prev[id], likes: newLikes}}));
             incrementTrackStats(id, 'Лайки', track.likes, isLiked ? -1 : 1).catch(err => console.error("Failed to update likes", err));
         }
 
@@ -374,26 +411,14 @@ const App: React.FC = () => {
         const newLikedArtistIds = isLiked ? user.likedArtistIds.filter(aid => aid !== id) : [...user.likedArtistIds, id];
         updatedUser = { ...user, likedArtistIds: newLikedArtistIds };
         updates.likedArtistIds = newLikedArtistIds;
-        
-        if (isLiked) {
-            setLikedArtists(prev => prev.filter(a => a.id !== id));
-        } else {
-            const artist = allArtists.find(a => a.id === id);
-            if (artist) setLikedArtists(prev => [...prev, artist]);
-        }
+        setUserLikedArtistIds(newLikedArtistIds);
 
     } else if (type === 'album') {
         const isLiked = user.favoriteCollectionIds.includes(id);
         const newFavoriteCollectionIds = isLiked ? user.favoriteCollectionIds.filter(cid => cid !== id) : [...user.favoriteCollectionIds, id];
         updatedUser = { ...user, favoriteCollectionIds: newFavoriteCollectionIds };
         updates.favoriteCollectionIds = newFavoriteCollectionIds;
-        
-        if (isLiked) {
-            setLikedAlbums(prev => prev.filter(a => a.id !== id));
-        } else {
-            const album = allCollections.find(a => a.id === id);
-            if (album) setLikedAlbums(prev => [...prev, album]);
-        }
+        setUserLikedAlbumIds(newFavoriteCollectionIds.filter(cid => collections[cid]?.collectionType === 'альбом'));
     }
 
     setUser(updatedUser);
@@ -416,8 +441,9 @@ const App: React.FC = () => {
   };
 
   const handleShufflePlay = () => {
-    if (tracks.length > 0) {
-      const shuffled = [...tracks].sort(() => 0.5 - Math.random());
+    const allTracksArray = Object.values(tracks);
+    if (allTracksArray.length > 0) {
+      const shuffled = [...allTracksArray].sort(() => 0.5 - Math.random());
       setShuffledTracks(shuffled);
       setCurrentTrackIndex(0);
       setIsPlaying(true);
@@ -440,8 +466,9 @@ const App: React.FC = () => {
   const handleLogout = () => {
       setUser(null);
       localStorage.removeItem('joysicUser');
-      setTracks([]);
-      setPlaylists([]);
+      setTracks({});
+      setCollections({});
+      setArtists({});
       setCurrentTrackIndex(null);
       setIsPlaying(false);
       setView('library');
@@ -449,7 +476,7 @@ const App: React.FC = () => {
 
   const handleScanSuccess = (decodedText: string) => {
       setIsScannerOpen(false);
-      const trackExists = tracks.some(t => t.id === decodedText);
+      const trackExists = !!tracks[decodedText];
       if (trackExists) {
           setScannedTrackId(decodedText);
       } else {
@@ -496,7 +523,7 @@ const App: React.FC = () => {
     );
   }
 
-  if (isLoading && !tracks.length) {
+  if (isLoading) {
     return <SplashScreen />;
   }
 
@@ -506,12 +533,12 @@ const App: React.FC = () => {
         {view === 'library' && (
           <LibraryPage
             user={user}
-            playlists={playlists}
-            likedAlbums={likedAlbums}
-            likedArtists={likedArtists}
+            playlistIds={userPlaylistIds}
+            likedAlbumIds={userLikedAlbumIds}
+            likedArtistIds={userLikedArtistIds}
             tracks={tracks}
-            allArtists={allArtists}
-            allCollections={allCollections}
+            artists={artists}
+            collections={collections}
             isLibraryHydrating={isLibraryHydrating}
             onSelectPlaylist={handleSelectPlaylist}
             onSelectArtist={handleSelectArtistById}
@@ -543,11 +570,11 @@ const App: React.FC = () => {
             />
           ) : null
         )}
-        {view === 'playlistDetail' && selectedPlaylist && (
+        {view === 'playlistDetail' && selectedPlaylistId && collections[selectedPlaylistId] && (
           <PlaylistDetailPage
-            playlist={selectedPlaylist}
+            playlist={collections[selectedPlaylistId]}
             onBack={() => setView('library')}
-            onPlayTrack={(trackId) => playTrackById(trackId, selectedPlaylist.tracks)}
+            onPlayTrack={(trackId) => playTrackById(trackId, collections[selectedPlaylistId].tracks)}
             currentTrackId={currentTrack?.id}
             isPlaying={isPlaying}
             onPlayPause={handlePlayPause}
@@ -563,7 +590,7 @@ const App: React.FC = () => {
             stats={{
               likedTracksCount: user.likedTrackIds.length,
               likedArtistsCount: user.likedArtistIds.length,
-              likedAlbumsCount: likedAlbums.length,
+              likedAlbumsCount: userLikedAlbumIds.length,
             }}
             onBack={() => setView('library')}
             onLogout={handleLogout}

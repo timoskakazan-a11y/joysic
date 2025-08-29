@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useCallback } from 'react';
 import type { User, Playlist, SimpleArtist, Track } from '../types';
 import { ShuffleIcon, SearchIcon, QrCodeIcon, SoundWaveIcon, MatBadge } from './IconComponents';
@@ -5,16 +6,16 @@ import TrackCover from './TrackCover';
 
 interface LibraryPageProps {
   user: User;
-  playlists: Playlist[];
-  likedAlbums: Playlist[];
-  likedArtists: SimpleArtist[];
-  tracks: Track[];
-  allArtists: SimpleArtist[];
-  allCollections: Playlist[];
+  playlistIds: string[];
+  likedAlbumIds: string[];
+  likedArtistIds: string[];
+  tracks: Record<string, Track>;
+  artists: Record<string, SimpleArtist>;
+  collections: Record<string, Playlist>;
   isLibraryHydrating: boolean;
   onSelectPlaylist: (playlist: Playlist) => void;
   onSelectArtist: (artistId: string) => void;
-  onPlayTrack: (trackId: string) => void;
+  onPlayTrack: (trackId: string, context?: Track[]) => void;
   onShufflePlayAll: () => void;
   onNavigateToProfile: () => void;
   onOpenScanner: () => void;
@@ -118,16 +119,25 @@ const SearchResultTrack = React.memo<{track: Track, isActive: boolean, isPlaying
     );
 });
 
-const LibraryPage: React.FC<LibraryPageProps> = ({ user, playlists, likedAlbums, likedArtists, tracks, allArtists, allCollections, isLibraryHydrating, onSelectPlaylist, onSelectArtist, onPlayTrack, onShufflePlayAll, onNavigateToProfile, onOpenScanner, currentTrackId, isPlaying, onOpenMatInfo }) => {
+const LibraryPage: React.FC<LibraryPageProps> = ({ user, playlistIds, likedAlbumIds, likedArtistIds, tracks, artists, collections, isLibraryHydrating, onSelectPlaylist, onSelectArtist, onPlayTrack, onShufflePlayAll, onNavigateToProfile, onOpenScanner, currentTrackId, isPlaying, onOpenMatInfo }) => {
   const [searchQuery, setSearchQuery] = useState('');
   
+  const playlists = useMemo(() => playlistIds.map(id => collections[id]).filter(Boolean), [playlistIds, collections]);
+  const likedAlbums = useMemo(() => likedAlbumIds.map(id => collections[id]).filter(Boolean), [likedAlbumIds, collections]);
+  const likedArtists = useMemo(() => likedArtistIds.map(id => artists[id]).filter(Boolean), [likedArtistIds, artists]);
+  
+  const allTracks = useMemo(() => Object.values(tracks), [tracks]);
+  const allArtists = useMemo(() => Object.values(artists), [artists]);
+  const allCollections = useMemo(() => Object.values(collections), [collections]);
+
+
   const searchResults = useMemo(() => {
     if (isLibraryHydrating || searchQuery.trim().length < 2) {
         return { tracks: [], artists: [], albums: [], playlists: [] };
     }
     const lowercasedQuery = searchQuery.toLowerCase();
 
-    const filteredTracks = tracks.filter(t => 
+    const filteredTracks = allTracks.filter(t => 
         t.title.toLowerCase().includes(lowercasedQuery) ||
         t.artists?.some(a => a.name.toLowerCase().includes(lowercasedQuery))
     );
@@ -144,7 +154,7 @@ const LibraryPage: React.FC<LibraryPageProps> = ({ user, playlists, likedAlbums,
     const filteredPlaylists = filteredCollections.filter(c => c.collectionType === 'плейлист');
 
     return { tracks: filteredTracks, artists: filteredArtists, albums: filteredAlbums, playlists: filteredPlaylists };
-  }, [searchQuery, tracks, allArtists, allCollections, isLibraryHydrating]);
+  }, [searchQuery, allTracks, allArtists, allCollections, isLibraryHydrating]);
 
 
   const hasContent = playlists.length > 0 || likedAlbums.length > 0 || likedArtists.length > 0;
@@ -161,7 +171,7 @@ const LibraryPage: React.FC<LibraryPageProps> = ({ user, playlists, likedAlbums,
                             track={track}
                             isActive={currentTrackId === track.id}
                             isPlaying={currentTrackId === track.id && !!isPlaying}
-                            onPlay={() => onPlayTrack(track.id)}
+                            onPlay={() => onPlayTrack(track.id, searchResults.tracks)}
                             onOpenMatInfo={onOpenMatInfo}
                         />
                     ))}

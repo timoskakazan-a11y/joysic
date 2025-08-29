@@ -1,3 +1,4 @@
+
 import React from 'react';
 import type { Track } from '../types';
 import { MusicNoteIcon, TextIcon, UserIcon, PlayIcon, PauseIcon, SoundWaveIcon } from './IconComponents';

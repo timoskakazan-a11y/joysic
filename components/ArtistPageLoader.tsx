@@ -1,3 +1,4 @@
+
 import React from 'react';
 
 const AnimatedPlaceholder: React.FC<{ className?: string }> = ({ className }) => (

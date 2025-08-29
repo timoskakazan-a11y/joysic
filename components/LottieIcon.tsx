@@ -1,4 +1,5 @@
 
+
 import React, { useEffect, useRef } from 'react';
 
 declare const lottie: any;

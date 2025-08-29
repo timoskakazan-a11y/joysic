@@ -1,3 +1,4 @@
+
 // =================================================================================
 // UNIFIED AIRTABLE API SERVICE
 // To definitively solve the "not authorized" error and improve reliability, this
@@ -227,23 +228,6 @@ export const fetchArtistDetails = async (artistId: string): Promise<Artist> => {
     
     // Filter playlists to only include albums
     const artistAlbums = allPlaylists.filter(p => p.collectionType === 'альбом');
-
-    // Hydrate artists for the fetched tracks (important for collabs)
-    const allArtistIds = new Set<string>();
-    artistTracks.forEach(t => t.artistIds.forEach(id => allArtistIds.add(id)));
-    
-    const artists = await fetchSimpleArtistsByIds(Array.from(allArtistIds));
-    const artistsMap = new Map(artists.map(a => [a.id, a]));
-    artistTracks.forEach(t => {
-      t.artists = t.artistIds.map(id => artistsMap.get(id)).filter((a): a is SimpleArtist => !!a);
-    });
-
-    // Hydrate tracks within albums
-    const artistTracksMap = new Map(artistTracks.map(t => [t.id, t]));
-    const populatedAlbums = artistAlbums.map(album => ({
-      ...album,
-      tracks: album.trackIds.map(id => artistTracksMap.get(id)).filter((t): t is Track => !!t)
-    }));
     
     return {
         id: artistRecord.id,
@@ -252,7 +236,7 @@ export const fetchArtistDetails = async (artistId: string): Promise<Artist> => {
         status: artistRecord.fields.Status,
         photo: mapAttachmentToImageAsset(artistRecord.fields.Фото?.[0]),
         tracks: artistTracks,
-        albums: populatedAlbums
+        albums: artistAlbums
     };
 };
 
